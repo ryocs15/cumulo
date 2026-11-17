@@ -83,9 +83,11 @@ def T(s, en=None):
 def pct(v):
     return f"%{v:.0f}" if LANG == "tr" else f"{v:.0f}%"
 
-APP_VERSION = "1.5.0"
+APP_VERSION = "1.5.1"
 APP_NAME = "Cumulo"  # görünen ad; exe, klasör, AUMID ve indirme dosyası adları güncelleme için eski kalır
-UPDATE_REPO = "ryocs15/hava-durumu-widget"  # GitHub Releases: yeni sürümler buradan iner
+UPDATE_REPO = "ryocs15/cumulo"  # GitHub Releases: yeni sürümler buradan iner
+# depo 2026-11-17'ye kadar "hava-durumu-widget" adındaydı; GitHub eski adresi yönlendiriyor
+UPDATE_REPOS = (UPDATE_REPO, "ryocs15/hava-durumu-widget")
 UPDATE_ASSET = "HavaDurumu.exe"   # tek dosyalık sürüm (1.2.0 ve öncesi bununla güncellenir)
 UPDATE_ZIP = "HavaDurumu.zip"     # klasör kipi: HavaDurumu.exe + _internal
 UPDATE_SETUP = "HavaDurumu-Kurulum.exe"  # 1.4.1 ve sonrası bununla güncellenir
@@ -262,7 +264,7 @@ def download_update(rel, dest, kind="exe"):
         rel = {k: rel.get(f"{kind}_{k}") for k in ("url", "size", "sha256")}
     magic, what = (b"PK", "zip") if kind == "zip" else (b"MZ", "exe")
     url = rel.get("url") or ""
-    if not url.startswith(f"https://github.com/{UPDATE_REPO}/releases/download/"):
+    if not any(url.startswith(f"https://github.com/{r}/releases/download/") for r in UPDATE_REPOS):
         raise ValueError(T("beklenmeyen indirme adresi"))
     h = hashlib.sha256()
     n = 0
