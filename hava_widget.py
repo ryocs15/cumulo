@@ -86,8 +86,6 @@ def pct(v):
 APP_VERSION = "1.5.1"
 APP_NAME = "Cumulo"  # görünen ad; exe, klasör, AUMID ve indirme dosyası adları güncelleme için eski kalır
 UPDATE_REPO = "ryocs15/cumulo"  # GitHub Releases: yeni sürümler buradan iner
-# depo 2026-11-17'ye kadar "hava-durumu-widget" adındaydı; GitHub eski adresi yönlendiriyor
-UPDATE_REPOS = (UPDATE_REPO, "ryocs15/hava-durumu-widget")
 UPDATE_ASSET = "HavaDurumu.exe"   # tek dosyalık sürüm (1.2.0 ve öncesi bununla güncellenir)
 UPDATE_ZIP = "HavaDurumu.zip"     # klasör kipi: HavaDurumu.exe + _internal
 UPDATE_SETUP = "HavaDurumu-Kurulum.exe"  # 1.4.1 ve sonrası bununla güncellenir
@@ -264,7 +262,7 @@ def download_update(rel, dest, kind="exe"):
         rel = {k: rel.get(f"{kind}_{k}") for k in ("url", "size", "sha256")}
     magic, what = (b"PK", "zip") if kind == "zip" else (b"MZ", "exe")
     url = rel.get("url") or ""
-    if not any(url.startswith(f"https://github.com/{r}/releases/download/") for r in UPDATE_REPOS):
+    if not url.startswith(f"https://github.com/{UPDATE_REPO}/releases/download/"):
         raise ValueError(T("beklenmeyen indirme adresi"))
     h = hashlib.sha256()
     n = 0
@@ -431,7 +429,7 @@ def alerts_for(loc, alerts, now=None):
             if mid in (towns.get(color) or []):
                 kinds = (a.get("weather") or {}).get(color) or []
                 out.append({"rank": rank, "color": color, "no": a.get("alertNo"),
-                            "kinds": [ALERT_KINDS.get(k, k) for k in kinds],
+                            "kinds": [ALERT_KINDS.get(k, k) for k in kinds], "codes": kinds,
                             "text": (a.get("text") or {}).get(color) or "",
                             "begin": a.get("begin"), "end": a.get("end")})
                 break
@@ -2752,7 +2750,8 @@ def event_text(e):
         return T("Rüzgar ") + fmt_wind(e.get("a", 0))
     if k == "alert":
         name = ALERT_COLORS.get(e.get("color"), ("",))[0]
-        return T('{} uyarı').format(name) + (f": {e['what']}" if e.get("what") else "")
+        what = ", ".join(ALERT_KINDS.get(w, w) for w in e["what"].split(", ")) if e.get("what") else ""
+        return T('{} uyarı').format(name) + (f": {what}" if what else "")
     return e.get("what") or k or ""
 
 
@@ -2847,7 +2846,7 @@ class EventLog:
             if sid not in seen:
                 seen.append(sid)
                 new.append(self._add(loc, "alert", now, color=a["color"],
-                                     what=", ".join(a["kinds"])))
+                                     what=", ".join(a["codes"])))  # kod: gösterirken o anki dile çevrilir
         st["alerts"] = seen[-30:]
         return new
 

@@ -19,4 +19,15 @@ unused = sorted(EN.keys() - keys)
 assert not missing, f"çevirisi yok: {missing}"
 assert not bad, f"yer tutucular farklı: {bad}"
 assert not unused, f"kullanılmayan çeviri: {unused}"
+
+# olay günlüğü uyarı türlerini kod olarak saklar, gösterirken çevirir; eski kayıtlar (ad) olduğu gibi kalır
+import sys  # noqa: E402
+sys.argv = [sys.argv[0]]
+sys.path.insert(0, HERE)
+import hava_widget as hw  # noqa: E402
+red = hw.ALERT_COLORS["red"][0]
+assert hw.event_text({"kind": "alert", "color": "red", "what": "wind, rain"}) == \
+    hw.T("{} uyarı").format(red) + ": " + hw.ALERT_KINDS["wind"] + ", " + hw.ALERT_KINDS["rain"]
+assert hw.event_text({"kind": "alert", "color": "red", "what": "Kuvvetli rüzgar"}).endswith(": Kuvvetli rüzgar")
+assert hw.event_text({"kind": "alert", "color": "red"}) == hw.T("{} uyarı").format(red)
 print(f"tamam: {len(keys)} metin")
