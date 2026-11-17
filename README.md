@@ -50,6 +50,26 @@ Change the language under **Widgets and settings > Dil / Language**.
 
 Cumulo is not an official product of Open-Meteo or MGM.
 
+## Building from source
+
+Requires Windows, Python 3.12+ and [Pillow](https://pypi.org/project/pillow/). Toast notifications also use
+the `winrt-Windows.UI.Notifications` and `winrt-Windows.Data.Xml.Dom` packages; without them the app falls
+back to tray balloons.
+
+```
+pip install pillow winrt-Windows.UI.Notifications winrt-Windows.Data.Xml.Dom
+python hava_widget.py          # run
+python test_lang.py            # check that every UI text has an English translation
+build.bat                      # build with PyInstaller (pip install pyinstaller)
+```
+
+The installer is built from `installer.iss` with [Inno Setup 6](https://jrsoftware.org/isinfo.php);
+`release.py` builds, packages and publishes a release.
+
+## License
+
+[MIT](LICENSE)
+
 ---
 
 ## Türkçe
@@ -91,3 +111,12 @@ Dili **Widget'lar ve ayarlar > Dil / Language** bölümünden değiştirebilirsi
 - [Open-Meteo](https://open-meteo.com): dünya geneli tahmin, hava kalitesi ve polen
 
 Cumulo, MGM'nin ya da Open-Meteo'nun resmi bir ürünü değildir.
+
+### Kaynaktan çalıştırma
+
+Windows, Python 3.12+ ve Pillow gerekir; ayrıntılar yukarıdaki
+[Building from source](#building-from-source) bölümünde.
+
+### Lisans
+
+[MIT](LICENSE)

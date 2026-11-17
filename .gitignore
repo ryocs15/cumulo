@@ -1,0 +1,10 @@
+build/
+dist/
+__pycache__/
+*.pyc
+config*.json
+cache*.json
+events*.json
+*.log
+_update/
+_update.zip
