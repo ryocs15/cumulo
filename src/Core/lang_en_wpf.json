@@ -1,0 +1,12 @@
+{
+ "   (sessiz: açık)": "   (quiet: on)",
+ "Bağlantı hatası": "Connection error",
+ "Başka renk…": "Other color…",
+ "Başlat menüsü kısayolu": "Start menu shortcut",
+ "Renk kodu (#RRGGBB):": "Color code (#RRGGBB):",
+ "Renk kodunu #RRGGBB biçiminde girin (ör. #3b6ea5).": "Enter the color code as #RRGGBB (e.g. #3b6ea5).",
+ "Sürüm {} hazır. Kurmak için widget'a sağ tıklayıp Güncelleme menüsünü aç.": "Version {} is ready. Right-click the widget and open Update to install it.",
+ "Tamam": "OK",
+ "{} uyarı: {}": "{} warning: {}",
+ "İptal": "Cancel"
+}

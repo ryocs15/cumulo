@@ -1,0 +1,176 @@
+<UserControl x:Class="HavaDurumu.Ui.DetailCard"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:HavaDurumu.Ui"
+             Width="{Binding Width}" Height="{Binding Height}" FontFamily="{StaticResource CardFont}">
+    <!-- Kompakt (340x190), büyütülmüş mini (340x368), Orta (360x426), Tam (360x584).
+         Python draw_card + draw_peek; koordinatlar taban çizgisinden üst kenara çevrildi. -->
+    <UserControl.Resources>
+        <ItemsPanelTemplate x:Key="CanvasPanel">
+            <Canvas />
+        </ItemsPanelTemplate>
+        <Style x:Key="AbsItem" TargetType="ContentPresenter">
+            <Setter Property="Canvas.Left" Value="{Binding Left}" />
+            <Setter Property="Canvas.Top" Value="{Binding Top}" />
+        </Style>
+    </UserControl.Resources>
+    <Border Background="{Binding Background}" CornerRadius="{Binding Radius}"
+            BorderBrush="{Binding AccentBrush}" BorderThickness="{Binding AccentThickness}">
+        <Canvas ClipToBounds="True" Effect="{Binding ContentEffect}">
+            <!-- hava efekti: arka plan ile yazılar arasında (CardAnimator çizer) -->
+            <ui:FxHost x:Name="Fx" Width="{Binding Width}" Height="{Binding Height}" />
+            <!-- başlık + saat + yenile -->
+            <Grid Canvas.Left="20" Canvas.Top="0" Width="{Binding TitleWidth}" Height="40">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Margin="0,13,10,0" FontSize="16" FontWeight="SemiBold" Text="{Binding Title}"
+                           TextTrimming="CharacterEllipsis" Foreground="{Binding TextBrush}" />
+                <TextBlock Grid.Column="1" Margin="0,16,0,0" FontSize="13" Text="{Binding ClockText}"
+                           Foreground="{Binding MutedBrush}" Visibility="{Binding ClockVisibility}" />
+            </Grid>
+            <TextBlock Style="{StaticResource RefreshGlyph}" Canvas.Left="{Binding RefreshLeft}" Canvas.Top="17"
+                       Width="16" Height="16" FontSize="12" Foreground="{Binding MutedBrush}"
+                       Visibility="{Binding RefreshVisibility}" />
+
+            <TextBlock Canvas.Left="20" Canvas.Top="80" Width="{Binding LineWidth}" TextAlignment="Center"
+                       FontSize="15" TextWrapping="Wrap" Text="{Binding StatusText}"
+                       Foreground="{Binding StatusBrush}" Visibility="{Binding NoDataVisibility}" />
+
+            <Canvas Width="{Binding Width}" Visibility="{Binding DataVisibility}">
+                <!-- anlık -->
+                <Image x:Name="MainIcon" Width="88" Height="88" Canvas.Left="12" Canvas.Top="42" />
+                <TextBlock Canvas.Right="20" Canvas.Top="61" FontSize="14" FontWeight="SemiBold"
+                           Text="{Binding HiLo}" Foreground="{Binding TextBrush}" />
+                <TextBlock Canvas.Right="20" Canvas.Top="86" FontSize="13" Text="{Binding Feels}"
+                           Foreground="{Binding MutedBrush}" />
+                <Viewbox Canvas.Left="112" Canvas.Top="45" MaxWidth="100" StretchDirection="DownOnly">
+                    <TextBlock FontSize="62" FontWeight="Light" Text="{Binding TempText}"
+                               Foreground="{Binding TempBrush}" />
+                </Viewbox>
+
+                <TextBlock Canvas.Left="20" Canvas.Top="134" MaxWidth="{Binding ConditionMaxWidth}"
+                           TextTrimming="CharacterEllipsis">
+                    <Run FontSize="15" FontWeight="SemiBold" Text="{Binding Condition, Mode=OneWay}"
+                         Foreground="{Binding TextBrush}" />
+                    <Run FontSize="13" Text="{Binding Yesterday, Mode=OneWay}" Foreground="{Binding MutedBrush}" />
+                </TextBlock>
+
+                <!-- MGM uyarı etiketi -->
+                <Border Canvas.Right="20" Canvas.Top="135" Height="21" CornerRadius="10" Padding="8,0"
+                        Background="{Binding AlertBrush}" Visibility="{Binding AlertVisibility}" Tag="alert"
+                        Cursor="Hand">
+                    <TextBlock VerticalAlignment="Center" FontSize="11" FontWeight="SemiBold" MaxWidth="176"
+                               TextTrimming="CharacterEllipsis" Text="{Binding AlertLabel}" Foreground="#1E1E1E"
+                               IsHitTestVisible="False" />
+                </Border>
+
+                <!-- ayırıcı çizgiler -->
+                <ItemsControl ItemsSource="{Binding Lines}" ItemsPanel="{StaticResource CanvasPanel}">
+                    <ItemsControl.ItemContainerStyle>
+                        <Style TargetType="ContentPresenter">
+                            <Setter Property="Canvas.Left" Value="20" />
+                            <Setter Property="Canvas.Top" Value="{Binding}" />
+                        </Style>
+                    </ItemsControl.ItemContainerStyle>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Rectangle Height="1"
+                                       Width="{Binding DataContext.LineWidth, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                       Fill="{Binding DataContext.FaintBrush, RelativeSource={RelativeSource AncestorType=ItemsControl}}" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- ayrıntılar (4 sütun) -->
+                <ItemsControl ItemsSource="{Binding Items}" ItemsPanel="{StaticResource CanvasPanel}"
+                              ItemContainerStyle="{StaticResource AbsItem}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Grid Width="{Binding DataContext.ItemWidth, RelativeSource={RelativeSource AncestorType=ItemsControl}}">
+                                <TextBlock FontSize="11" Text="{Binding Label}" TextTrimming="CharacterEllipsis"
+                                           Foreground="{Binding DataContext.MutedBrush, RelativeSource={RelativeSource AncestorType=ItemsControl}}" />
+                                <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                                    <Ellipse Width="8" Height="8" Margin="0,1,5,0" Fill="{Binding DotBrush}"
+                                             Visibility="{Binding DotVisibility}" VerticalAlignment="Center" />
+                                    <TextBlock FontSize="13" FontWeight="SemiBold" Text="{Binding Value}"
+                                               MaxWidth="72" TextTrimming="CharacterEllipsis"
+                                               Foreground="{Binding ValueBrush}" />
+                                </StackPanel>
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- saatlik: ikonlar -->
+                <TextBlock Canvas.Left="20" Canvas.Top="{Binding NoHoursTop}" Width="{Binding LineWidth}"
+                           TextAlignment="Center" FontSize="12" Text="{Binding NoHoursText}"
+                           Foreground="{Binding MutedBrush}" />
+                <ItemsControl ItemsSource="{Binding Hours}" ItemsPanel="{StaticResource CanvasPanel}"
+                              ItemContainerStyle="{StaticResource AbsItem}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Width="{Binding ColW}">
+                                <TextBlock FontSize="11" Text="{Binding Label}" TextAlignment="Center"
+                                           Foreground="{Binding DataContext.MutedBrush, RelativeSource={RelativeSource AncestorType=ItemsControl}}" />
+                                <Image Source="{Binding Icon}" Width="{Binding IconSize}" Height="{Binding IconSize}"
+                                       Margin="{Binding IconMargin}" />
+                                <TextBlock FontSize="13" FontWeight="SemiBold" Text="{Binding Temp}"
+                                           TextAlignment="Center" Margin="{Binding TempMargin}"
+                                           Foreground="{Binding TempBrush}" />
+                                <TextBlock FontSize="10" Text="{Binding Prob}" TextAlignment="Center"
+                                           Foreground="{Binding DataContext.BlueBrush, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                           Visibility="{Binding ProbVisibility}" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <!-- saatlik: grafik (config "hourly": "chart") -->
+                <Canvas Visibility="{Binding ChartVisibility}">
+                    <Polygon Points="{Binding ChartFill}" Fill="{Binding ChartFillBrush}" />
+                    <Polyline Points="{Binding ChartLine}" Stroke="{Binding ChartLineBrush}" StrokeThickness="2"
+                              StrokeLineJoin="Round" />
+                    <ItemsControl ItemsSource="{Binding ChartPoints}" ItemsPanel="{StaticResource CanvasPanel}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Canvas>
+                                    <Ellipse Canvas.Left="{Binding DotLeft}" Canvas.Top="{Binding DotTop}" Width="6"
+                                             Height="6" Fill="{Binding Fill}" StrokeThickness="1"
+                                             Stroke="{Binding DataContext.TextBrush, RelativeSource={RelativeSource AncestorType=ItemsControl}}" />
+                                    <TextBlock Canvas.Left="{Binding TempLeft}" Canvas.Top="{Binding TempTop}" Width="50"
+                                               TextAlignment="Center" FontSize="12" FontWeight="SemiBold"
+                                               Text="{Binding Temp}"
+                                               Foreground="{Binding DataContext.TextBrush, RelativeSource={RelativeSource AncestorType=ItemsControl}}" />
+                                    <TextBlock Canvas.Left="{Binding LabelLeft}" Canvas.Top="380" Width="50"
+                                               TextAlignment="Center" FontSize="10" Text="{Binding Label}"
+                                               Foreground="{Binding DataContext.MutedBrush, RelativeSource={RelativeSource AncestorType=ItemsControl}}" />
+                                </Canvas>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </Canvas>
+
+                <!-- günlük satırlar (Tam düzen) -->
+                <ItemsControl ItemsSource="{Binding Days}" ItemsPanel="{StaticResource CanvasPanel}"
+                              ItemTemplate="{StaticResource DayRowTemplate}">
+                    <ItemsControl.ItemContainerStyle>
+                        <Style TargetType="ContentPresenter">
+                            <Setter Property="Canvas.Top" Value="{Binding Top}" />
+                        </Style>
+                    </ItemsControl.ItemContainerStyle>
+                </ItemsControl>
+
+                <!-- alt bilgi -->
+                <TextBlock Canvas.Left="20" Canvas.Top="{Binding FooterTop}" MaxWidth="250" FontSize="11"
+                           TextTrimming="CharacterEllipsis" Text="{Binding FooterText}"
+                           FontWeight="{Binding FooterWeight}" Foreground="{Binding FooterBrush}" />
+            </Canvas>
+
+            <!-- şehir noktaları (sağ alt) -->
+            <ItemsControl Canvas.Right="20" Canvas.Top="{Binding DotsTop}" ItemsSource="{Binding Dots}"
+                          ItemTemplate="{StaticResource DotTemplate}" ItemsPanel="{StaticResource DotsPanel}" />
+        </Canvas>
+    </Border>
+</UserControl>

@@ -1,0 +1,141 @@
+<UserControl x:Class="HavaDurumu.Ui.MiniCard"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:HavaDurumu.Ui"
+             Width="150" Height="{Binding Height}" FontFamily="{StaticResource CardFont}">
+    <!-- Mini (150 x 78) ve Mini+ (150 x 112). Konumlar Python draw_small() ile aynı
+         (taban çizgileri üst kenara çevrildi). Sayfa 0: şimdi, 1: saatlik, 2: yarın. -->
+    <Border Background="{Binding Background}" CornerRadius="{Binding Radius}"
+            BorderBrush="{Binding AccentBrush}" BorderThickness="{Binding AccentThickness}">
+        <Canvas ClipToBounds="True" Effect="{Binding ContentEffect}">
+            <!-- hava efekti: arka plan ile yazılar arasında (CardAnimator çizer) -->
+            <ui:FxHost x:Name="Fx" Width="{Binding Width}" Height="{Binding Height}" />
+            <!-- sayfa 0: şimdi -->
+            <Canvas Width="150" Visibility="{Binding Page0Visibility}">
+                <Image x:Name="MainIcon" Width="58" Height="58" Canvas.Left="3" Canvas.Top="6" />
+                <Viewbox Canvas.Right="9" Canvas.Top="3" MaxWidth="77" StretchDirection="DownOnly">
+                    <TextBlock Text="{Binding TempText}" FontSize="24" Foreground="{Binding TempBrush}" />
+                </Viewbox>
+                <TextBlock Canvas.Right="9" Canvas.Top="34" MaxWidth="80" TextAlignment="Right"
+                           TextTrimming="CharacterEllipsis" FontSize="12" Text="{Binding Line2}"
+                           Foreground="{Binding TextBrush}" />
+                <TextBlock Canvas.Right="9" Canvas.Top="51" MaxWidth="84" TextAlignment="Right"
+                           TextTrimming="CharacterEllipsis" FontSize="12" Text="{Binding City}"
+                           Foreground="{Binding TextBrush}" />
+            </Canvas>
+
+            <!-- sayfa 1: önümüzdeki saatler -->
+            <Canvas Width="150" Visibility="{Binding Page1Visibility}">
+                <TextBlock Canvas.Left="0" Canvas.Top="28" Width="150" TextAlignment="Center" FontSize="11"
+                           Text="{Binding PageHoursEmpty}" Foreground="{Binding MutedBrush}" />
+                <ItemsControl ItemsSource="{Binding PageHours}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <Canvas />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemContainerStyle>
+                        <Style TargetType="ContentPresenter">
+                            <Setter Property="Canvas.Left" Value="{Binding Left}" />
+                            <Setter Property="Canvas.Top" Value="{Binding Top}" />
+                        </Style>
+                    </ItemsControl.ItemContainerStyle>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <StackPanel Width="{Binding ColW}">
+                                <TextBlock FontSize="10" Text="{Binding Label}" TextAlignment="Center"
+                                           Foreground="{Binding DataContext.MutedBrush, RelativeSource={RelativeSource AncestorType=ItemsControl}}" />
+                                <Image Source="{Binding Icon}" Width="28" Height="28" Margin="0,2,0,0" />
+                                <TextBlock FontSize="13" FontWeight="SemiBold" Text="{Binding Temp}"
+                                           TextAlignment="Center" Margin="0,-1,0,0" Foreground="{Binding TempBrush}" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+            </Canvas>
+
+            <!-- sayfa 2: yarın -->
+            <Canvas Width="150" Visibility="{Binding Page2Visibility}">
+                <TextBlock Canvas.Left="0" Canvas.Top="28" Width="150" TextAlignment="Center" FontSize="11"
+                           Text="{Binding TomorrowEmpty}" Foreground="{Binding MutedBrush}" />
+                <Image Source="{Binding TomorrowIcon}" Width="52" Height="52" Canvas.Left="4" Canvas.Top="8" />
+                <TextBlock Canvas.Right="9" Canvas.Top="5" FontSize="12" FontWeight="SemiBold" Text="Yarın"
+                           Foreground="{Binding MutedBrush}" />
+                <Viewbox Canvas.Right="9" Canvas.Top="19" MaxWidth="81" StretchDirection="DownOnly">
+                    <TextBlock Text="{Binding TomorrowHiLo}" FontSize="19" Foreground="{Binding TomorrowBrush}" />
+                </Viewbox>
+                <TextBlock Canvas.Right="9" Canvas.Top="46" FontSize="11" Text="{Binding TomorrowProb}"
+                           Foreground="{Binding TextBrush}" />
+            </Canvas>
+
+            <!-- veri yokken -->
+            <Canvas Width="150" Visibility="{Binding NoDataVisibility}">
+                <TextBlock Canvas.Right="9" Canvas.Top="28" MaxWidth="132" TextAlignment="Right"
+                           TextTrimming="CharacterEllipsis" FontSize="11" Text="{Binding StatusText}"
+                           Foreground="{Binding StatusBrush}" />
+                <TextBlock Canvas.Right="9" Canvas.Top="51" MaxWidth="84" TextAlignment="Right"
+                           TextTrimming="CharacterEllipsis" FontSize="12" Text="{Binding City}"
+                           Foreground="{Binding TextBrush}" />
+            </Canvas>
+
+            <!-- Mini+: 12 saatlik sıcaklık eğrisi + yağış olasılığı çubukları -->
+            <Canvas Width="150" Visibility="{Binding SparkVisibility}">
+                <ItemsControl ItemsSource="{Binding SparkBars}">
+                    <ItemsControl.ItemsPanel>
+                        <ItemsPanelTemplate>
+                            <Canvas />
+                        </ItemsPanelTemplate>
+                    </ItemsControl.ItemsPanel>
+                    <ItemsControl.ItemContainerStyle>
+                        <Style TargetType="ContentPresenter">
+                            <Setter Property="Canvas.Left" Value="{Binding Left}" />
+                            <Setter Property="Canvas.Top" Value="{Binding Top}" />
+                        </Style>
+                    </ItemsControl.ItemContainerStyle>
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Rectangle Width="2.8" Height="{Binding Height}"
+                                       Fill="{Binding DataContext.BlueBrush, RelativeSource={RelativeSource AncestorType=ItemsControl}}"
+                                       Opacity="0.6" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+                <Polygon Points="{Binding SparkFill}" Fill="{Binding SparkFillBrush}" />
+                <Polyline Points="{Binding SparkLine}" Stroke="{Binding SparkLineBrush}" StrokeThickness="1.6"
+                          StrokeLineJoin="Round" />
+                <TextBlock Canvas.Left="{Binding SparkFirstAt.X}" Canvas.Top="{Binding SparkFirstAt.Y}"
+                           FontSize="9" Text="{Binding SparkFirst}" Foreground="{Binding MutedBrush}" />
+                <TextBlock Canvas.Right="12" Canvas.Top="{Binding SparkLastTop}" FontSize="9"
+                           Text="{Binding SparkLast}" Foreground="{Binding MutedBrush}" />
+                <TextBlock Canvas.Left="0" Canvas.Top="77" Width="150" TextAlignment="Center" FontSize="9"
+                           Text="{Binding SparkEmpty}" Foreground="{Binding MutedBrush}" />
+            </Canvas>
+
+            <!-- MGM uyarısı (sol üst üçgen, yalnızca ilk sayfada) -->
+            <Canvas Tag="alert" Background="Transparent" Width="24" Height="24" Cursor="Hand"
+                    Visibility="{Binding SmallAlertVisibility}" ToolTip="{Binding AlertLabel}">
+                <Path Data="M5,18 L12,5 L19,18 Z" Fill="{Binding AlertBrush}" IsHitTestVisible="False" />
+                <Path Data="M12,9.5 L12,13.5" Stroke="#1E1E1E" StrokeThickness="1.6" IsHitTestVisible="False" />
+                <Ellipse Canvas.Left="11.2" Canvas.Top="15" Width="1.6" Height="1.6" Fill="#1E1E1E"
+                         IsHitTestVisible="False" />
+            </Canvas>
+
+            <!-- alt satır: yenile + şehir noktaları + sayfa göstergesi -->
+            <TextBlock Style="{StaticResource RefreshGlyph}" Canvas.Left="6" Canvas.Top="{Binding BottomTop}"
+                       Width="14" Height="14" FontSize="11" Margin="0,-3,0,0" Foreground="{Binding MutedBrush}"
+                       Visibility="{Binding RefreshVisibility}" />
+            <ItemsControl Canvas.Left="28" Canvas.Top="{Binding BottomTop}" MaxWidth="{Binding CityDotsMaxWidth}"
+                          ItemsSource="{Binding Dots}" ItemTemplate="{StaticResource DotTemplate}"
+                          ItemsPanel="{StaticResource DotsPanel}" ClipToBounds="True" />
+            <StackPanel Orientation="Horizontal" Canvas.Right="13" Canvas.Top="{Binding BottomTop}" Height="12"
+                        Visibility="{Binding PageDotsVisibility}" Tag="page" Background="Transparent">
+                <Ellipse Width="4.4" Height="4.4" Margin="1.3,0" Fill="{Binding TextBrush}"
+                         Opacity="{Binding PageDotOpacity[0]}" IsHitTestVisible="False" />
+                <Ellipse Width="4.4" Height="4.4" Margin="1.3,0" Fill="{Binding TextBrush}"
+                         Opacity="{Binding PageDotOpacity[1]}" IsHitTestVisible="False" />
+                <Ellipse Width="4.4" Height="4.4" Margin="1.3,0" Fill="{Binding TextBrush}"
+                         Opacity="{Binding PageDotOpacity[2]}" IsHitTestVisible="False" />
+            </StackPanel>
+        </Canvas>
+    </Border>
+</UserControl>

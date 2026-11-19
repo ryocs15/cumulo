@@ -13,11 +13,12 @@
 
 ## Download
 
-Get **`HavaDurumu-Kurulum.exe`** from the [latest release](../../releases/latest) and run it.
+Get **`Cumulo-Setup.exe`** from the [latest release](../../releases/latest) and run it.
 
-- Installs for your user only, no administrator rights needed.
+- Installs for your user only, no administrator rights needed. Nothing else to install: the .NET runtime is included.
 - Adds Cumulo to the Start menu; uninstall it from **Settings > Apps**.
 - Updates itself: new versions are downloaded and installed from inside the app.
+- Requires 64-bit Windows 10 (1809 or later) or Windows 11.
 
 The installer is not code-signed, so Windows SmartScreen may warn on first run
 (**More info > Run anyway**).
@@ -28,11 +29,13 @@ The installer is not code-signed, so Windows SmartScreen may warn on first run
 - Any city in the world (Open-Meteo); Turkish provinces and districts use official MGM data
 - Several cities with automatic cycling, and extra widgets for other cities or screens
 - Layouts from a tiny icon + temperature card up to the full forecast, plus side-by-side and stacked city rows
+- Animated weather icons and backgrounds (rain, snow, clouds, fog, stars, sun glow…); animations pause while the
+  widget is covered, the screen is locked or turned off
 - Themes: match the weather, illustrated scene, dark, light, glass, transparent, follow Windows, custom color or your own image
 - Notifications: rain on the way, temperature thresholds, very high UV, morning summary, umbrella/coat reminders, quiet hours
 - Air quality, UV index, pollen, sunrise/sunset and moon phase
 - MGM weather warnings and radar for Turkey
-- Tray icon with the current temperature, a hotkey to bring the widget forward, click-through mode
+- A hotkey to bring the widget forward, start with Windows
 - °C / °F, km/h / m/s, English and Turkish interface (follows your Windows language)
 - Settings export and import
 
@@ -40,7 +43,7 @@ The installer is not code-signed, so Windows SmartScreen may warn on first run
 
 ## Usage
 
-Right-click the widget or the tray icon to open the menu. Drag with the left mouse button to move it.
+Right-click the widget to open the menu. Drag with the left mouse button to move it.
 Change the language under **Widgets and settings > Dil / Language**.
 
 ## Data sources
@@ -52,19 +55,23 @@ Cumulo is not an official product of Open-Meteo or MGM.
 
 ## Building from source
 
-Requires Windows, Python 3.12+ and [Pillow](https://pypi.org/project/pillow/). Toast notifications also use
-the `winrt-Windows.UI.Notifications` and `winrt-Windows.Data.Xml.Dom` packages; without them the app falls
-back to tray balloons.
+Requires Windows and the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0). No NuGet packages.
 
 ```
-pip install pillow winrt-Windows.UI.Notifications winrt-Windows.Data.Xml.Dom
-python hava_widget.py          # run
-python test_lang.py            # check that every UI text has an English translation
-build.bat                      # build with PyInstaller (pip install pyinstaller)
+dotnet build -c Release                                   # build
+bin\Release\net10.0-windows10.0.19041.0\HavaDurumu.exe    # run
+bin\Release\net10.0-windows10.0.19041.0\HavaDurumu.exe --selftest
+python tools\test_lang.py                                 # every UI text has an English translation
+build.bat                                                 # self-contained build in build\publish
 ```
 
+UI texts are written in Turkish and wrapped in `T(...)`; English translations live in `src/Core/lang_en.json`
+(shared with the earlier Python version) and `src/Core/lang_en_wpf.json`.
 The installer is built from `installer.iss` with [Inno Setup 6](https://jrsoftware.org/isinfo.php);
-`release.py` builds, packages and publishes a release.
+`release.py` builds and publishes a release.
+
+Versions up to 1.6.0 were written in Python; that code is kept in the
+[`python-1.6`](../../tree/python-1.6) branch.
 
 ## License
 
@@ -78,11 +85,12 @@ The installer is built from `installer.iss` with [Inno Setup 6](https://jrsoftwa
 
 ### İndirme
 
-[Son sürüm](../../releases/latest) sayfasından **`HavaDurumu-Kurulum.exe`** dosyasını indirip çalıştırın.
+[Son sürüm](../../releases/latest) sayfasından **`Cumulo-Setup.exe`** dosyasını indirip çalıştırın.
 
-- Yalnızca sizin kullanıcınıza kurulur, yönetici izni gerekmez.
+- Yalnızca sizin kullanıcınıza kurulur, yönetici izni gerekmez. Başka bir şey kurmanız gerekmez: .NET içindedir.
 - Başlat menüsüne eklenir; **Ayarlar > Uygulamalar** bölümünden kaldırılabilir.
 - Kendini günceller: yeni sürümler uygulama içinden indirilip kurulur.
+- 64 bit Windows 10 (1809 ve sonrası) ya da Windows 11 gerekir.
 
 Kurulum dosyası imzalı olmadığı için Windows SmartScreen ilk açılışta uyarı gösterebilir
 (**Ek bilgi > Yine de çalıştır**).
@@ -93,16 +101,18 @@ Kurulum dosyası imzalı olmadığı için Windows SmartScreen ilk açılışta 
 - Türkiye'deki il ve ilçeler için MGM verileri, uyarıları ve radarı; dünyadaki her şehir için Open-Meteo
 - Birden çok şehir ve şehirler arasında otomatik geçiş; başka şehir ya da ekran için ek widget'lar
 - Mikro karttan tam tahmine kadar düzenler, şehirleri yan yana ya da alt alta gösterme
+- Hareketli hava ikonları ve arka planlar (yağmur, kar, bulut, sis, yıldız, güneş parıltısı…); widget'ın üstü
+  kapalıyken, ekran kilitliyken ya da kapalıyken animasyonlar durur
 - Temalar: havaya göre, çizimli sahne, koyu, açık, cam, saydam, Windows temasını izle, özel renk ya da kendi görseliniz
 - Bildirimler: yaklaşan yağış, sıcaklık eşikleri, çok yüksek UV, sabah özeti, şemsiye / mont hatırlatması, sessiz saatler
 - Hava kalitesi, UV indeksi, polen, gün doğumu / batımı ve ay evresi
-- Sistem tepsisinde sıcaklık ikonu, öne getirme kısayol tuşu, tıklamayı geçirme
+- Öne getirme kısayol tuşu, Windows ile başlatma
 - °C / °F, km/sa / m/sn, Türkçe ve İngilizce arayüz (Windows diline göre seçilir)
 - Ayarları dışa ve içe aktarma
 
 ### Kullanım
 
-Widget'a ya da tepsi ikonuna sağ tıklayınca menü açılır. Sol tuşla sürükleyerek taşınır.
+Widget'a sağ tıklayınca menü açılır. Sol tuşla sürükleyerek taşınır.
 Dili **Widget'lar ve ayarlar > Dil / Language** bölümünden değiştirebilirsiniz.
 
 ### Veri kaynakları
@@ -112,10 +122,10 @@ Dili **Widget'lar ve ayarlar > Dil / Language** bölümünden değiştirebilirsi
 
 Cumulo, MGM'nin ya da Open-Meteo'nun resmi bir ürünü değildir.
 
-### Kaynaktan çalıştırma
+### Kaynaktan derleme
 
-Windows, Python 3.12+ ve Pillow gerekir; ayrıntılar yukarıdaki
-[Building from source](#building-from-source) bölümünde.
+Windows ve .NET 10 SDK gerekir; ayrıntılar yukarıdaki [Building from source](#building-from-source) bölümünde.
+1.6.0'a kadarki Python sürümü [`python-1.6`](../../tree/python-1.6) dalındadır.
 
 ### Lisans
 

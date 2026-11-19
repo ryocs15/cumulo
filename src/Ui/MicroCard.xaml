@@ -1,0 +1,26 @@
+<UserControl x:Class="HavaDurumu.Ui.MicroCard"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:HavaDurumu.Ui"
+             Width="100" Height="44" FontFamily="{StaticResource CardFont}">
+    <!-- Mikro kart (100 x 44): ikon + sıcaklık + şehir -->
+    <Border Background="{Binding Background}" CornerRadius="{Binding Radius}"
+            BorderBrush="{Binding AccentBrush}" BorderThickness="{Binding AccentThickness}">
+        <Canvas ClipToBounds="True" Effect="{Binding ContentEffect}">
+            <!-- hava efekti: arka plan ile yazılar arasında (CardAnimator çizer) -->
+            <ui:FxHost x:Name="Fx" Width="{Binding Width}" Height="{Binding Height}" />
+            <Image x:Name="MainIcon" Width="36" Height="36" Canvas.Left="3" Canvas.Top="4"
+                   Visibility="{Binding DataVisibility}" />
+            <Viewbox Canvas.Right="7" Canvas.Top="3" MaxWidth="51" StretchDirection="DownOnly"
+                     Visibility="{Binding DataVisibility}">
+                <TextBlock Text="{Binding TempText}" FontSize="20" Foreground="{Binding TempBrush}" />
+            </Viewbox>
+            <TextBlock Canvas.Right="7" Canvas.Top="6" FontSize="16" Text="…"
+                       Foreground="{Binding StatusBrush}" Visibility="{Binding NoDataVisibility}"
+                       ToolTip="{Binding StatusText}" />
+            <TextBlock Canvas.Right="7" Canvas.Top="27" MaxWidth="54" TextAlignment="Right"
+                       TextTrimming="CharacterEllipsis" FontSize="10" Text="{Binding City}"
+                       Foreground="{Binding TextBrush}" />
+        </Canvas>
+    </Border>
+</UserControl>

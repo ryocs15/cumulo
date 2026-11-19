@@ -1,0 +1,37 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <!-- Windows sürümlü TFM: SDK, toast (WinRT) için Microsoft.Windows.SDK.NET.Ref paketini kendisi bağlar. -->
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <SupportedOSPlatformVersion>10.0.17763.0</SupportedOSPlatformVersion>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>HavaDurumu</AssemblyName>
+    <RootNamespace>HavaDurumu</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <StartupObject>HavaDurumu.Program</StartupObject>
+    <ApplicationIcon>icon.ico</ApplicationIcon>
+    <Product>Cumulo</Product>
+    <Version>1.7.0</Version>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+  </PropertyGroup>
+
+  <!-- Yalnızca güncelleme testi (C-4): dotnet publish -p:UpdateTest=1 [-p:UpdateTestV2=1]. Yayın derlemesi bunları içermez. -->
+  <PropertyGroup Condition="'$(UpdateTest)' == '1'">
+    <DefineConstants>$(DefineConstants);UPDATE_TEST</DefineConstants>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(UpdateTestV2)' == '1'">
+    <DefineConstants>$(DefineConstants);UPDATE_TEST_V2</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- İngilizce metinler: lang_en.json Python lang_en.py'den üretilir (tools\export_lang.py). -->
+    <EmbeddedResource Include="src\Core\lang_en.json" LogicalName="HavaDurumu.lang_en.json" />
+    <EmbeddedResource Include="src\Core\lang_en_wpf.json" LogicalName="HavaDurumu.lang_en_wpf.json" />
+  </ItemGroup>
+
+</Project>

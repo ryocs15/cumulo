@@ -1,0 +1,42 @@
+<UserControl x:Class="HavaDurumu.Ui.VMiniCard"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:ui="clr-namespace:HavaDurumu.Ui"
+             Width="84" Height="150" FontFamily="{StaticResource CardFont}">
+    <!-- Dikey mini kart (84 x 150) -->
+    <Border Background="{Binding Background}" CornerRadius="{Binding Radius}"
+            BorderBrush="{Binding AccentBrush}" BorderThickness="{Binding AccentThickness}">
+        <Canvas ClipToBounds="True" Effect="{Binding ContentEffect}">
+            <!-- hava efekti: arka plan ile yazılar arasında (CardAnimator çizer) -->
+            <ui:FxHost x:Name="Fx" Width="{Binding Width}" Height="{Binding Height}" />
+            <Image x:Name="MainIcon" Width="54" Height="54" Canvas.Left="15" Canvas.Top="6"
+                   Visibility="{Binding DataVisibility}" />
+            <Viewbox Canvas.Left="4" Canvas.Top="60" Width="76" Height="30" StretchDirection="DownOnly"
+                     Visibility="{Binding DataVisibility}">
+                <TextBlock Text="{Binding TempText}" FontSize="22" Foreground="{Binding TempBrush}" />
+            </Viewbox>
+            <TextBlock Canvas.Left="4" Canvas.Top="90" Width="76" TextAlignment="Center"
+                       TextTrimming="CharacterEllipsis" FontSize="11" Text="{Binding Line2}"
+                       Foreground="{Binding TextBrush}" Visibility="{Binding DataVisibility}" />
+            <TextBlock Canvas.Left="4" Canvas.Top="72" Width="76" TextAlignment="Center"
+                       TextTrimming="CharacterEllipsis" FontSize="10" Text="{Binding StatusText}"
+                       Foreground="{Binding StatusBrush}" Visibility="{Binding NoDataVisibility}" />
+            <TextBlock Canvas.Left="4" Canvas.Top="107" Width="76" TextAlignment="Center"
+                       TextTrimming="CharacterEllipsis" FontSize="11" Text="{Binding City}"
+                       Foreground="{Binding TextBrush}" />
+
+            <Canvas Tag="alert" Background="Transparent" Width="24" Height="24" Cursor="Hand"
+                    Visibility="{Binding AlertVisibility}" ToolTip="{Binding AlertLabel}">
+                <Path Data="M5,18 L12,5 L19,18 Z" Fill="{Binding AlertBrush}" IsHitTestVisible="False" />
+                <Path Data="M12,9.5 L12,13.5" Stroke="#1E1E1E" StrokeThickness="1.6" IsHitTestVisible="False" />
+                <Ellipse Canvas.Left="11.2" Canvas.Top="15" Width="1.6" Height="1.6" Fill="#1E1E1E"
+                         IsHitTestVisible="False" />
+            </Canvas>
+
+            <TextBlock Style="{StaticResource RefreshGlyph}" Canvas.Left="6" Canvas.Top="133" Width="14"
+                       Height="14" FontSize="11" Foreground="{Binding MutedBrush}" />
+            <ItemsControl Canvas.Left="28" Canvas.Top="136" MaxWidth="48" ItemsSource="{Binding Dots}"
+                          ItemTemplate="{StaticResource DotTemplate}" ItemsPanel="{StaticResource DotsPanel}" />
+        </Canvas>
+    </Border>
+</UserControl>

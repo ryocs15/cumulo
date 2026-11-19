@@ -1,0 +1,19 @@
+<Window x:Class="HavaDurumu.Ui.WidgetWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Cumulo" WindowStyle="None" Background="Transparent"
+        ShowInTaskbar="False" ResizeMode="NoResize" ShowActivated="False" SizeToContent="Manual"
+        WindowStartupLocation="Manual" UseLayoutRounding="True" SnapsToDevicePixels="True"
+        TextOptions.TextFormattingMode="Display" TextOptions.TextRenderingMode="ClearType">
+    <WindowChrome.WindowChrome>
+        <WindowChrome GlassFrameThickness="-1" CaptionHeight="0" ResizeBorderThickness="0" CornerRadius="0" />
+    </WindowChrome.WindowChrome>
+    <!-- Stage: tasarım birimleri (ölçek 1.0). Ölçek LayoutTransform ile uygulanır. -->
+    <Canvas x:Name="Stage" HorizontalAlignment="Left" VerticalAlignment="Top">
+        <Canvas.LayoutTransform>
+            <ScaleTransform x:Name="StageScale" ScaleX="1" ScaleY="1" />
+        </Canvas.LayoutTransform>
+        <ContentControl x:Name="BigHost" Visibility="Collapsed" Focusable="False" />
+        <ContentControl x:Name="SmallHost" Focusable="False" />
+    </Canvas>
+</Window>
