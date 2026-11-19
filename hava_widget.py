@@ -83,7 +83,7 @@ def T(s, en=None):
 def pct(v):
     return f"%{v:.0f}" if LANG == "tr" else f"{v:.0f}%"
 
-APP_VERSION = "1.5.1"
+APP_VERSION = "1.6.0"
 APP_NAME = "Cumulo"  # görünen ad; exe, klasör, AUMID ve indirme dosyası adları güncelleme için eski kalır
 UPDATE_REPO = "ryocs15/cumulo"  # GitHub Releases: yeni sürümler buradan iner
 UPDATE_ASSET = "HavaDurumu.exe"   # tek dosyalık sürüm (1.2.0 ve öncesi bununla güncellenir)
@@ -1039,7 +1039,8 @@ FOG_D = (214, 220, 228, 255)
 _icon_cache = {}
 
 
-ANIM_FRAMES = 48  # bir animasyon döngüsündeki kare sayısı (48 x 50 ms = 2,4 sn)
+ANIM_CYCLE = 2.25  # sn: bir ikon animasyonu döngüsü
+ANIM_FRAMES = 135  # döngüdeki kare sayısı = ANIM_CYCLE x ekranın Hz değeri (set_hz günceller)
 
 
 def icon_animated(code, night):
@@ -1213,6 +1214,8 @@ def make_icon(code, size, night, scheme="dark", frame=None):
         cloud(50, 52, 1.05, CLOUD)
 
     out = im.resize((size, size), Image.LANCZOS)
+    if len(_icon_cache) > 1500:  # yüksek Hz'de bir ikonun yüzlerce karesi olur; bellek sınırsız büyümesin
+        _icon_cache.clear()
     _icon_cache[key] = out
     return out
 
@@ -1764,6 +1767,10 @@ class MONITORINFO(ctypes.Structure):
                 ("rcWork", wintypes.RECT), ("dwFlags", wintypes.DWORD)]
 
 
+class MONITORINFOEXW(MONITORINFO):
+    _fields_ = [("szDevice", ctypes.c_wchar * 32)]
+
+
 user32.DefWindowProcW.argtypes = [wintypes.HWND, wintypes.UINT, wintypes.WPARAM, wintypes.LPARAM]
 user32.DefWindowProcW.restype = ctypes.c_ssize_t
 user32.CreateWindowExW.argtypes = [wintypes.DWORD, wintypes.LPCWSTR, wintypes.LPCWSTR,
@@ -1810,6 +1817,27 @@ def pil_to_hicon(img):
     gdi32.DeleteObject(hbm)
     gdi32.DeleteObject(mask)
     return hicon
+
+
+user32.MonitorFromWindow.argtypes = [wintypes.HWND, wintypes.DWORD]
+user32.MonitorFromWindow.restype = wintypes.HANDLE
+gdi32.CreateDCW.argtypes = [wintypes.LPCWSTR, wintypes.LPCWSTR, wintypes.LPCWSTR, ctypes.c_void_p]
+gdi32.CreateDCW.restype = wintypes.HDC
+gdi32.GetDeviceCaps.argtypes = [wintypes.HDC, ctypes.c_int]
+
+
+def refresh_hz(mon):
+    """Ekranın yenileme hızı (Hz); okunamazsa 60."""
+    mi = MONITORINFOEXW()
+    mi.cbSize = ctypes.sizeof(MONITORINFOEXW)
+    if mon and user32.GetMonitorInfoW(mon, ctypes.byref(mi)):
+        hdc = gdi32.CreateDCW(mi.szDevice, mi.szDevice, None, None)
+        if hdc:
+            hz = gdi32.GetDeviceCaps(hdc, 116)  # VREFRESH
+            gdi32.DeleteDC(hdc)
+            if 20 <= hz <= 1000:  # 0 / 1 = "donanım varsayılanı"
+                return hz
+    return 60
 
 
 def work_area(x, y):
@@ -2250,9 +2278,9 @@ MINI_LINES = [("hl", T("En yüksek / en düşük")), ("feels", T("Hissedilen")),
               ("sun", T("Gün doğumu / batımı"))]
 SMALL_LAYOUTS = ("micro", "mini", "miniplus", "vmini")
 MAX_DOTS = 12
-# ikon animasyonu ~21 kare/sn (yalnızca ikonun alanı güncellenir). Windows zamanlayıcısı 15,6 ms
-# adımlarla çalışır: 50 ms istenirse 62,5 ms olur (16 kare/sn); 45 ms -> 46,9 ms.
-ANIM_MS = 45
+# Animasyonlar widget'ın bulunduğu ekranın yenileme hızında (Hz) çizilir. Windows zamanlayıcısı
+# 1 ms çözünürlüğe alınır (varsayılan 15,6 ms adımda 7 ms isteği 15,6 ms olur) ve çizim süresi
+# bekleme süresinden düşülür.
 WET = set(RAIN) | set(SNOW) | {"KKY", "DY", "GSY", "KGSY"}
 
 
@@ -2260,15 +2288,15 @@ WET = set(RAIN) | set(SNOW) | {"KKY", "DY", "GSY", "KGSY"}
 # Kartın arka planı ile yazılar arasında, havaya göre bir hareket. Her hava durumunun gündüz ve
 # gece için ayrı bir görünümü var (ör. açık: gündüz güneş parıltısı, gece yıldızlar; bulutlu gece
 # yıldızsız, ay ışığında bulutlar). Kartın sabit kısmı önbellekte durur; her karede yalnızca efekt
-# katmanı çizilir. Yavaş efektler (bulut, sis, parıltı) daha seyrek güncellenir; widget başka
-# pencerelerin altında kalınca hiç çizilmez.
-FX_MS_FAST, FX_MS_SLOW, FX_MS_HIDDEN = 45, 90, 400
+# katmanı çizilir. Widget başka pencerelerin altında kalınca hiç çizilmez.
+FX_MS_HIDDEN = 400
+FX_FPS = 60  # arka plan efektleri en fazla bu hızda: her karede bütün kart çizilir, 144 Hz'de bir
+             # çekirdeği doldurur. Aradaki karelerde yalnızca hava ikonu ekranın hızında yenilenir.
 FX_KINDS = {"A": "clear", "AB": "fewclouds", "PB": "partly", "CB": "overcast", "KKY": "sleet",
             "DY": "hail", "GSY": "storm", "KGSY": "storm", "SIS": "fog", "PUS": "haze",
             "DMN": "smoke", "R": "wind", "GKR": "wind", "KKR": "wind", "KF": "dust",
             "SCK": "heat", "SGK": "frost", "HHY": "rain",
             "HSY": "showers", "SY": "showers", "MSY": "showers", "KSY": "showers"}
-FX_SLOW = {"clear", "fewclouds", "partly", "overcast", "fog", "haze", "smoke", "heat", "frost"}
 
 
 def fx_kind(code, night=False):
@@ -2294,12 +2322,20 @@ def _soft_sprite(w, h, color, alpha, blur, shapes):
 
 
 def _paste(out, spr, x, y):
-    """alpha_composite, kenardan taşan parçalar kırpılarak."""
-    sx, sy = max(0, -x), max(0, -y)
-    if sx >= spr.width or sy >= spr.height or x >= out.width or y >= out.height:
-        return
-    out.alpha_composite(spr, (max(0, x), max(0, y)), (sx, sy, min(spr.width, out.width - x),
-                                                       min(spr.height, out.height - y)))
+    """Saydam şekli kartın RGB arka planına karıştırır; kenardan taşan kısmı paste kırpar."""
+    out.paste(spr, (x, y), spr)
+
+
+def _clip_mask(A, x, y, w, h):
+    """Maskeyi (w x h) kartın içinde kalan kısmına kırpar: her karede yalnızca görünen alan işlenir."""
+    box = (max(0, -x), max(0, -y), min(A.width, w - x), min(A.height, h - y))
+    return A.crop(box), (x + box[0], y + box[1])
+
+
+def _paste_lit(out, col, A, pos, z):
+    """Tek renkli ışığı (glow, hale, leke) z parlaklığıyla karıştırır; z her karede yeniden hesaplanır,
+    hazır parlaklık basamakları arasında atlama olmaz."""
+    out.paste(col, pos + (pos[0] + A.width, pos[1] + A.height), A.point([int(v * z) for v in range(256)]))
 
 
 class AmbientFX:
@@ -2404,12 +2440,12 @@ class AmbientFX:
         """Açık temada açık renkler görünmez: efektler koyu mavi-gri çizilir."""
         return (35, 55, 85) if self.light else tuple(col)
 
-    def frame(self, t):
-        out = Image.new("RGBA", (self.w, self.h), (0, 0, 0, 0))
-        d = ImageDraw.Draw(out)
+    def draw_on(self, out, t):
+        """Efektleri kartın RGB arka planına çizer ("RGBA" çizim kipi saydam şekilleri karıştırır).
+        Ayrı bir saydam katmana çizip birleştirmekten ~2 ms hızlı."""
+        d = ImageDraw.Draw(out, "RGBA")
         for fn, data in self.layers:
             fn(out, d, t, data)
-        return out
 
     # -- katmanlar
     def clouds(self, far, near, col, alpha, y_hi, size=(0.5, 0.85), speed=1.0, blur=0.13):
@@ -2506,42 +2542,32 @@ class AmbientFX:
                        fill=c + (int(220 * f_ * math.sin(q * math.pi)),), width=max(1, round(S)))
 
     def glow(self, cx, cy, r, col, lo, hi):
-        """Güneşin / ayın arkasında nefes alır gibi parlayan ışık (8 hazır parlaklık)."""
+        """Güneşin / ayın arkasında nefes alır gibi parlayan ışık."""
         R = int(r * 1.9)
-        col = (120, 90, 30) if self.light else col
-        base = _soft_sprite(2 * R, 2 * R, col, 255, R * 0.35, [(R * 0.35, R * 0.35, R * 1.65, R * 1.65)])
-        A = base.getchannel("A")
-        sprites = []
-        for k in range(8):
-            amp = lo + (hi - lo) * (0.5 - 0.5 * math.cos(k / 8 * 2 * math.pi))
-            im = base.copy()
-            im.putalpha(A.point(lambda v, amp=amp: int(v * amp)))
-            sprites.append(im)
-        self.layers.append((self._d_glow, (sprites, (int(cx - base.width / 2), int(cy - base.height / 2)))))
+        col = (120, 90, 30) if self.light else tuple(col)
+        A = _soft_sprite(2 * R, 2 * R, col, 255, R * 0.35,
+                         [(R * 0.35, R * 0.35, R * 1.65, R * 1.65)]).getchannel("A")
+        A, pos = _clip_mask(A, int(cx - A.width / 2), int(cy - A.height / 2), self.w, self.h)
+        self.layers.append((self._d_glow, (A, col, lo, hi, pos)))
 
     def _d_glow(self, out, d, t, data):
-        sprites, pos = data
-        _paste(out, sprites[int(t / 0.35) % 8], *pos)
+        A, col, lo, hi, pos = data
+        z = lo + (hi - lo) * (0.5 - 0.5 * math.cos(t / 2.8 * 2 * math.pi))  # 2,8 sn'de bir nefes
+        _paste_lit(out, col, A, pos, z)
 
     def sunflare(self, cx, cy, r, s=1.0):
         """Güneşin çevresinde nabız gibi atan ince hale halkası (yalnızca çok sıcak günlerde)."""
         if self.light:  # açık temada sarı ışık zemini kirletir
             return
-        col = (255, 244, 210, 0)  # sarı mavi zeminde griye döner: neredeyse beyaz, sıcak bir ışık
+        col = (255, 244, 210)  # sarı mavi zeminde griye döner: neredeyse beyaz, sıcak bir ışık
         q = int(r * 0.95)
         th = max(2, int(r * 0.09))
         ring = Image.new("L", (2 * q + 8 * th, 2 * q + 8 * th), 0)
         o = 4 * th
         ImageDraw.Draw(ring).ellipse([o, o, o + 2 * q, o + 2 * q], outline=255, width=th)
         ring = ring.filter(ImageFilter.GaussianBlur(th * 0.8))
-        rings = []
-        for k in range(8):
-            im = Image.new("RGBA", ring.size, col)
-            z = s * (0.25 + 0.5 * (0.5 - 0.5 * math.cos(k / 8 * 2 * math.pi)))
-            im.putalpha(ring.point(lambda v, z=z: int(v * z)))
-            rings.append(im)
-        self.layers.append((self._d_sunflare, (rings, (int(cx) - ring.width // 2,
-                                                       int(cy) - ring.height // 2))))
+        ring, pos = _clip_mask(ring, int(cx) - ring.width // 2, int(cy) - ring.height // 2, self.w, self.h)
+        self.layers.append((self._d_sunflare, (ring, col, s, pos)))
 
     def spots(self, cx, cy, r, s=1.0):
         """Güneşten kartın içine doğru dizilen, hafifçe süzülüp parlayan soluk ışık lekeleri."""
@@ -2552,26 +2578,21 @@ class AmbientFX:
         for f, rr, col, a in ((0.45, 0.16, (255, 225, 150), 0.55), (0.8, 0.3, (190, 225, 255), 0.30),
                               (1.15, 0.1, (255, 210, 120), 0.65), (1.5, 0.45, (255, 240, 205), 0.22)):
             q = int(r * rr) + 1
-            spr = _soft_sprite(2 * q, 2 * q, col, 255, q * 0.35, [(0, 0, 2 * q, 2 * q)])
-            A = spr.getchannel("A")
-            lv = []
-            for k in range(6):
-                im = spr.copy()
-                im.putalpha(A.point(lambda v, z=a * s * (0.4 + 0.6 * k / 5): int(v * z)))
-                lv.append(im)
-            ghosts.append((f, lv))
+            A = _soft_sprite(2 * q, 2 * q, col, 255, q * 0.35, [(0, 0, 2 * q, 2 * q)]).getchannel("A")
+            ghosts.append((f, A, col, a * s))
         self.layers.append((self._d_spots, (ghosts, (cx, cy, dx, dy))))
 
     def _d_spots(self, out, d, t, data):
         ghosts, (cx, cy, dx, dy) = data
-        for i, (f, lv) in enumerate(ghosts):
+        for i, (f, A, col, a) in enumerate(ghosts):
             g = f + 0.06 * math.sin(t * 0.45 + i * 1.3)
-            spr = lv[int((0.5 + 0.5 * math.sin(t * 0.8 + i * 1.7)) * 5.99)]
-            _paste(out, spr, int(cx + dx * g - spr.width / 2), int(cy + dy * g - spr.height / 2))
+            z = a * (0.4 + 0.6 * (0.5 + 0.5 * math.sin(t * 0.8 + i * 1.7)))
+            _paste_lit(out, col, A, (int(cx + dx * g - A.width / 2), int(cy + dy * g - A.height / 2)), z)
 
     def _d_sunflare(self, out, d, t, data):
-        rings, rpos = data
-        _paste(out, rings[int(t / 0.4) % 8], *rpos)  # 3,2 sn'de bir nabız
+        ring, col, s, pos = data
+        z = s * (0.25 + 0.5 * (0.5 - 0.5 * math.cos(t / 3.2 * 2 * math.pi)))  # 3,2 sn'de bir nabız
+        _paste_lit(out, col, ring, pos, z)
 
     def motes(self, n, col, amax):
         """Aşağıdan yukarı süzülen, sönerek kaybolan ışık zerreleri."""
@@ -3617,11 +3638,12 @@ class MenuPanel:
     def _fade(self, step):
         if self._closing:
             return
-        self.surface.alpha = min(255, round(255 * (step + 1) / 5))
+        n = max(3, round(78 / self.app.frame_ms))  # ~78 ms, ekranın her karesinde bir adım
+        self.surface.alpha = min(255, round(255 * (step + 1) / n))
         if self._frame is not None:
             self.surface.show(self._frame)
-        if step < 4:
-            self.top.after(14, lambda: self._fade(step + 1))
+        if step < n - 1:
+            self.top.after(self.app.next_ms(), lambda: self._fade(step + 1))
 
     def close(self):
         if self._closing:
@@ -4321,6 +4343,7 @@ class WeatherWidget:
         self.last_img = None
         self.hits = []
         self.anim_frame = 0
+        self.frame_ms = 1000 / 60
         self._anim_needed = False
         self._theme_cache = (0, False)
         self._tray_key = None
@@ -4378,6 +4401,7 @@ class WeatherWidget:
         r.after(60_000 - int(time.time() * 1000) % 60_000 + 200, self.tick)  # dakika başına hizalı
         self.refresh()
         self.schedule_rotate()
+        self._timer_fine(True)  # animasyonlar ekranın Hz değerinde akabilsin
         self.schedule_anim()
         r.after(3000, self.cleanup_old_exe)
         if "--update" in sys.argv:  # HavaDurumu.exe --update : varsa yeni sürümü sormadan kur
@@ -5034,10 +5058,40 @@ class WeatherWidget:
             self.root.after_cancel(self.anim_job)
             self.anim_job = None
         if self.cfg.get("animate") or self.cfg.get("effects", True):
-            ms = ANIM_MS
-            if getattr(self, "_fx_on", False):
-                ms = FX_MS_HIDDEN if getattr(self, "_fx_hidden", False) else getattr(self, "_fx_ms", ANIM_MS)
-            self.anim_job = self.root.after(ms, self._anim_tick)
+            if getattr(self, "_fx_on", False) and getattr(self, "_fx_hidden", False):
+                self.anim_job = self.root.after(FX_MS_HIDDEN, self._anim_tick)
+            elif not self._anim_needed:  # kartta hareket yok: ekran hızında boşuna uyanma
+                self.anim_job = self.root.after(100, self._anim_tick)
+            else:
+                # sabit kare adımı: ms tam sayıya yuvarlansa da ortalama ekranın Hz değerinde kalır;
+                # çizim kare süresini aşarsa hedef "şimdi"ye çekilir, gecikme birikmez
+                self.next_ms()  # ekran değiştiyse Hz'i günceller
+                now = time.perf_counter()
+                ms = self.frame_ms
+                if getattr(self, "_fx_on", False) and not getattr(self, "_fx_parts", None):
+                    ms = max(ms, 1000 / FX_FPS)
+                self._anim_t = max(getattr(self, "_anim_t", 0.0) + ms / 1000, now)
+                self.anim_job = self.root.after(max(1, round((self._anim_t - now) * 1000)),
+                                                self._anim_tick)
+
+    def next_ms(self, spent=0.0):
+        """Bir sonraki kareye kalan ms: ekranın bir kare süresi eksi bu karenin çizim süresi.
+        Widget başka ekrana geçince o ekranın Hz değeri alınır."""
+        mon = user32.MonitorFromWindow(self.hwnd, 2) if getattr(self, "hwnd", None) else None
+        if mon != getattr(self, "_mon", 0):
+            self._mon = mon
+            self.set_hz(refresh_hz(mon))
+        return max(1, round(self.frame_ms - spent * 1000))
+
+    def set_hz(self, hz):
+        global ANIM_FRAMES
+        # shortcut: Hz yalnızca widget başka ekrana geçince okunur; ekranın hızı Windows ayarından
+        # değiştirilirse uygulama yeniden açılana dek eski hız kalır, gerekirse WM_DISPLAYCHANGE dinlenmeli
+        self.frame_ms = 1000 / hz
+        if ANIM_FRAMES != round(ANIM_CYCLE * hz):
+            ANIM_FRAMES = round(ANIM_CYCLE * hz)
+            _icon_cache.clear()  # önbellekteki kare numaraları eski döngü uzunluğuna göre
+            self.anim_frame = 0
 
     def _anim_tick(self):
         self.anim_job = None
@@ -5045,9 +5099,13 @@ class WeatherWidget:
         if (self._anim_needed and not self.fade_job and not self.hidden
                 and not self._resize_job and not self._fx_hidden):  # büyüme sürerken / görünmezken bekle
             self.anim_frame = (self.anim_frame + 1) % ANIM_FRAMES
+            now = time.perf_counter()
+            fx_wait = self._fx_on and now < getattr(self, "_fx_next", 0.0)
             try:
-                parts = getattr(self, "_anim_parts", None)
-                if parts and (self.surface.w, self.surface.h) == (self.w, self.h):
+                parts = self._fx_parts if fx_wait else getattr(self, "_anim_parts", None)
+                if fx_wait and not parts:
+                    pass  # efekt karesinin zamanı gelmedi, ikon da durağan
+                elif parts and (self.surface.w, self.surface.h) == (self.w, self.h):
                     # hızlı yol: yalnızca ikonun alanı (kartın kalanı önbellekteki görüntüde aynı)
                     for base, code, isz, night, IS, theme, lx, ly, side, off in parts:
                         reg = base.crop((lx, ly, lx + side, ly + side))
@@ -5059,6 +5117,8 @@ class WeatherWidget:
                     img = self.draw()
                     self.last_img = img
                     self.surface.show(img)
+                    # sabit adım: ekranın kare adımı 60'ın katı olmasa da ortalama FX_FPS
+                    self._fx_next = max(getattr(self, "_fx_next", 0.0) + 1 / FX_FPS, now)
             except Exception:
                 log(traceback.format_exc())
         self.schedule_anim()
@@ -5284,12 +5344,13 @@ class WeatherWidget:
         R = self.px(22 * float(self.cfg.get("radius", 22)) / 22)
         big_a, small_a = big.getchannel("A"), small.getchannel("A")
         empty = Image.new("RGBA", (uw, uh), (0, 0, 0, 0))
-        self._timer_fine(True)
-        t0 = time.perf_counter()
+        t0 = tf = time.perf_counter()
         self._anim_frames = 0  # ölçüm için: gösterilen kare sayısı
 
         def frame():
+            nonlocal tf
             self._resize_job = None
+            tf = time.perf_counter()
             p = min(1.0, (time.perf_counter() - t0) / duration)
             e = 1 - (1 - p) ** 3  # hızlı başlayıp yavaşlayan geçiş
             rx, ry = ox + (nx - ox) * e, oy + (ny - oy) * e
@@ -5308,9 +5369,8 @@ class WeatherWidget:
             self.surface.show(canvas)
             self._anim_frames += 1
             if p < 1.0:
-                self._resize_job = self.root.after(4, frame)
+                self._resize_job = self.root.after(self.next_ms(time.perf_counter() - tf), frame)
             else:
-                self._timer_fine(False)
                 self._resize_window(nx, ny, nw, nh)
                 self.render()
         frame()
@@ -5948,12 +6008,13 @@ class WeatherWidget:
         else:
             self.surface.show(img)
 
-    def _fade(self, old, new, i, steps=8):
+    def _fade(self, old, new, i):
+        steps = max(4, round(190 / self.frame_ms))  # ~190 ms, ekranın her karesinde bir adım
         if self._resize_job or new.size != (self.surface.w, self.surface.h):
             self.fade_job = None  # pencere boyutu değişti (büyüme / küçülme): solmayı bırak
             return
         self.surface.show(Image.blend(old, new, i / steps))
-        self.fade_job = self.root.after(22, self._fade, old, new, i + 1) if i < steps else None
+        self.fade_job = self.root.after(self.next_ms(), self._fade, old, new, i + 1) if i < steps else None
 
     def draw_refresh(self, d, cx, cy, r, st):
         """Yenile düğmesi (dairesel ok); tıklanabilir alanı döndürür.
@@ -6010,7 +6071,8 @@ class WeatherWidget:
         self.hits = []
         self._anim_needed = False
         self._anim_parts = []
-        self._fx_on, self._fx_ms = False, FX_MS_SLOW
+        self._fx_on = False
+        self._fx_parts = []
         MOON_STATE["q"] = int(moon_phase() * 28 + 0.5) % 28
         if not self.multi:
             img = self.draw_card(self.loc, self.layout, self.w, self.h, (0, 0))
@@ -6076,14 +6138,13 @@ class WeatherWidget:
                                         and theme != "clear") else None
         if fxk:
             self._anim_needed = self._fx_on = True
-            if fxk not in FX_SLOW or anim:
-                self._fx_ms = FX_MS_FAST
             fx_obj = self.fx_object(fxk, w, h, st["icons"] == "light", code,
                                     (ipos[0] + isz / 2, ipos[1] + isz / 2, isz * 0.75), night)
             if ck + ("fx",) in cache:
                 bg, lay_, bga, hits = cache[ck + ("fx",)]
                 self.hits.extend(hits)
-                return self.fx_frame(bg, lay_, bga, fx_obj, anim, code, isz, night, IS, frame, ipos)
+                return self.fx_frame(bg, lay_, bga, fx_obj, anim, code, isz, night, IS, frame, ipos,
+                                     multi)
         if anim:
             self._anim_needed = True
             if ck in cache:
@@ -6101,9 +6162,10 @@ class WeatherWidget:
         def finish(radius):
             if fxk:  # arka plan ayrı tutulur: efekt, arka plan ile yazılar arasına çizilir
                 bg = self.compose_bg(w, h, code, night, radius, dayf, accent)
-                cache[ck + ("fx",)] = (bg, layer, bg.getchannel("A"), self.hits[h0:])
-                return self.fx_frame(bg, layer, bg.getchannel("A"), fx_obj, anim, code, isz, night,
-                                     IS, frame, ipos)
+                bga, bg = bg.getchannel("A"), bg.convert("RGB")
+                cache[ck + ("fx",)] = (bg, layer, bga, self.hits[h0:])
+                return self.fx_frame(bg, layer, bga, fx_obj, anim, code, isz, night, IS, frame, ipos,
+                                     multi)
             img = self.compose(layer, code, night, radius, dayf, accent)
             if not anim:
                 return img
@@ -6747,13 +6809,15 @@ class WeatherWidget:
             store[key] = AmbientFX(kind, w, h, self.S, light, RAIN.get(code, 3), sun_at, night)
         return store[key]
 
-    @staticmethod
-    def fx_frame(bg, layer, bga, fx_obj, anim, code, isz, night, IS, frame, ipos):
-        img = bg.copy()
-        img.alpha_composite(fx_obj.frame(time.monotonic()))
-        img.putalpha(bga)  # efekt kartın köşelerinden taşmasın
+    def fx_frame(self, bg, layer, bga, fx_obj, anim, code, isz, night, IS, frame, ipos, multi):
+        img = bg.copy()  # RGB: efektler doğrudan üstüne karıştırılır
+        fx_obj.draw_on(img, time.monotonic())
+        img.putalpha(bga)  # kartın yuvarlak köşeleri (efekt köşelerden taşmasın)
         img.alpha_composite(layer)
         if anim:
+            if multi is None:  # efekt kareleri arasında ikon bu ikonsuz kare üstünde yenilenir
+                self._fx_parts = [(img.copy(), code, isz, night, IS, self.theme, ipos[0], ipos[1],
+                                   isz, (0, 0))]
             img.alpha_composite(make_icon(code, isz, night, IS, frame), ipos)
         return img
 
