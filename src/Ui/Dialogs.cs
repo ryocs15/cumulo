@@ -85,7 +85,10 @@ public static class Dialogs
                 },
             });
             if (AlertService.TryParseUtc(a.Begin, out var b) && AlertService.TryParseUtc(a.End, out var e))
-                panel.Children.Add(Label($"{b.ToLocalTime():dd.MM HH:mm} – {e.ToLocalTime():dd.MM HH:mm}", 4, Brushes.DimGray));
+            {
+                var tr = TimeSpan.FromHours(3);   // MGM uyarıları yalnızca Türkiye için: kartla aynı Türkiye saati (WeatherData.UtcOffset)
+                panel.Children.Add(Label($"{Fmt.LocalTime(b, tr):dd.MM} {Fmt.Hm(Fmt.LocalTime(b, tr))} – {Fmt.LocalTime(e, tr):dd.MM} {Fmt.Hm(Fmt.LocalTime(e, tr))}", 4, Brushes.DimGray));
+            }
             panel.Children.Add(Label(a.Text, 4));
             panel.Children.Add(new Separator { Margin = new Thickness(0, 8, 0, 8) });
         }

@@ -22,8 +22,6 @@ public sealed class FxHost : FrameworkElement
     protected override int VisualChildrenCount => 1;
     protected override Visual GetVisualChild(int index) => _visual;
 
-    public AmbientFx? Fx => _fx;
-
     public void SetFx(AmbientFx? fx, double w, double h, double radius)
     {
         if (!ReferenceEquals(fx, _fx))

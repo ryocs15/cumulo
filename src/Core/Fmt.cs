@@ -8,6 +8,7 @@ public static class Units
 {
     public static bool Fahrenheit { get; set; }
     public static bool WindMs { get; set; }
+    public static bool Clock12 { get; set; }
 }
 
 /// Gösterim biçimleri — Python sürümündeki fmt_temp, tint, fmt_wind, wind_dir, aqi_level vb.
@@ -124,8 +125,14 @@ public static class Fmt
     {
         var n = NowLocal(offset);
         int wd = ((int)n.DayOfWeek + 6) % 7;
-        return $"{GunKisa[wd]} {n.Day} {AyKisa[n.Month - 1]} · {n:HH:mm}";
+        return $"{GunKisa[wd]} {n.Day} {AyKisa[n.Month - 1]} · {Hm(n)}";
     }
+
+    /// Saat: "14:05" ya da 12 saat seçiliyse "2:05 PM" (config "clock_12h").
+    public static string Hm(DateTime t) => t.ToString(Units.Clock12 ? "h:mm tt" : "HH:mm", Inv);
+
+    /// Saatlik tahmin etiketi: "14:00" ya da "2 PM" (dar sütunlara sığsın).
+    public static string Hour(DateTime t) => t.ToString(Units.Clock12 ? (t.Minute == 0 ? "h tt" : "h:mm tt") : "HH:mm", Inv);
 
     public static string LocTitle(Location l)
     {

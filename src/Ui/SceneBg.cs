@@ -42,6 +42,8 @@ public static class SceneBg
     /// Kullanıcının görseli: karta göre kırpılır (UniformToFill), hafif bulanık ve %38 koyulaştırılmış.
     public static Brush? Image(string path, double w, double h)
     {
+        // silinmiş / taşınmış görsel: her çizimde yeniden açıp günlüğe yazmasın; kart düz renge düşer
+        if (!File.Exists(path)) return null;
         DateTime mtime;
         try { mtime = File.GetLastWriteTimeUtc(path); }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException) { return null; }

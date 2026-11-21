@@ -7,6 +7,8 @@ public static class Log
 {
     public static string? FilePath { get; set; }
 
+    private const long MaxBytes = 1 << 20;
+
     /// HAVADURUMU_DEBUG=1 iken yazılan ayrıntı kayıtları.
     public static readonly bool DebugOn = Environment.GetEnvironmentVariable("HAVADURUMU_DEBUG") == "1";
 
@@ -20,6 +22,9 @@ public static class Log
         if (FilePath is null) return;
         try
         {
+            // ağ yokken dakikada bir hata yazılır (günde ~1,5 MB); 1 MB'ı geçince tek yedeğe taşınır
+            if (File.Exists(FilePath) && new FileInfo(FilePath).Length > MaxBytes)
+                File.Move(FilePath, FilePath + ".1", overwrite: true);
             File.AppendAllText(FilePath,
                 $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} {message}{Environment.NewLine}");
         }

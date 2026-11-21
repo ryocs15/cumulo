@@ -314,5 +314,32 @@ public static class WeatherIcons
         return image;
     }
 
-    private static Brush B(Color c) => Theme.Frozen(c);
+    private static string _style = "color";
+
+    /// İkon stili (config "icon_style"): color, pastel (beyaza doğru açılmış), mono (aynı parlaklıkta gri).
+    /// Bütün renkler B()'den geçtiği için çizim tek yerde değişir; değişince önbellekler boşalır.
+    public static string Style
+    {
+        get => _style;
+        set
+        {
+            if (value == _style) return;
+            _style = value;
+            Cache.Clear();
+            BitmapCache.Clear();
+        }
+    }
+
+    private static Brush B(Color c) => Theme.Frozen(_style switch
+    {
+        "mono" => Gray(c),
+        "pastel" => Theme.Mix(c, Color.FromArgb(c.A, 255, 255, 255), 0.45),
+        _ => c,
+    });
+
+    private static Color Gray(Color c)
+    {
+        byte l = (byte)Math.Round(Theme.Luminance(c) * 255);
+        return Color.FromArgb(c.A, l, l, l);
+    }
 }

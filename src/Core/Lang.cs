@@ -64,7 +64,7 @@ public static class Lang
             var spec = m.Groups[1].Value;
             if (spec.StartsWith('.') && spec.EndsWith('f') && a is IConvertible c)
                 return c.ToDouble(CultureInfo.InvariantCulture).ToString("F" + spec[1..^1], CultureInfo.InvariantCulture);
-            if (spec == "%H:%M" && a is DateTime dt) return dt.ToString("HH:mm", CultureInfo.InvariantCulture);
+            if (spec == "%H:%M" && a is DateTime dt) return Fmt.Hm(dt);
             return Convert.ToString(a, CultureInfo.InvariantCulture) ?? "";
         });
     }

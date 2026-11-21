@@ -113,12 +113,18 @@ public static class Theme
     }
 
     /// Temaya göre yazı stili (Python style()).
-    public static CardStyle StyleFor(string theme, string? customHex)
+    /// textHex (config "text_color"): seçilirse yazı bu renkte, soluk tonlar temanın saydamlığıyla.
+    /// İkon tonu (LightIcons) zemine bağlı kaldığı için temadan gelir.
+    public static CardStyle StyleFor(string theme, string? customHex, string? textHex = null)
     {
-        if (theme == "light") return Light;
-        if (theme == "clear") return Clear;
-        if (theme == "custom" && Luminance(CustomColors(customHex).Top) > 0.62) return Light;
-        return Dark;
+        var st = theme == "light" ? Light
+            : theme == "clear" ? Clear
+            : theme == "custom" && Luminance(CustomColors(customHex).Top) > 0.62 ? Light
+            : Dark;
+        if (textHex is null || !Regex.IsMatch(textHex, "^#?[0-9a-fA-F]{6}$")) return st;
+        var c = HexRgb(textHex);
+        Color A(byte a) => Color.FromArgb(a, c.R, c.G, c.B);
+        return st with { Text = c, Muted = A(st.Muted.A), Faint = A(st.Faint.A), Track = A(st.Track.A) };
     }
 
     /// Kart arka planı (Python compose_bg). "clear" temada saydam; opacity tüm zemine uygulanır.

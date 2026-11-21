@@ -4,9 +4,9 @@ namespace HavaDurumu.Core;
 public static class Constants
 {
 #if UPDATE_TEST_V2
-    public const string AppVersion = "1.7.1";   // yalnızca güncelleme testi derlemesi (C-4)
+    public const string AppVersion = "99.0.0";   // yalnızca güncelleme testi derlemesi (C-4): her gerçek sürümden büyük
 #else
-    public const string AppVersion = "1.7.0";
+    public const string AppVersion = "1.7.1";
 #endif
 
     /// Görünen ad. exe (HavaDurumu.exe), kurulum klasörü, AUMID ve indirme dosyası adları

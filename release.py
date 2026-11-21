@@ -34,7 +34,7 @@ ISCC = os.path.join(os.environ.get("LOCALAPPDATA", ""), "Programs", "Inno Setup 
 REPO = "ryocs15/cumulo"
 # yayın derlemesinde bulunmaması gereken test izleri (güncelleme testi derlemesi: -p:UpdateTest=1)
 FORBIDDEN = ["cumulo-test"]
-# sürüm satırı: test bloğundaki 1.7.1 değil, #else altındaki gerçek sürüm
+# sürüm satırı: test bloğundaki 99.0.0 değil, #else altındaki gerçek sürüm
 VER_RE = re.compile(r'(#else\s*\n\s*public const string AppVersion = ")([^"]+)(";)')
 
 

@@ -16,7 +16,7 @@
     <StartupObject>HavaDurumu.Program</StartupObject>
     <ApplicationIcon>icon.ico</ApplicationIcon>
     <Product>Cumulo</Product>
-    <Version>1.7.0</Version>
+    <Version>1.7.1</Version>
     <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
   </PropertyGroup>
 

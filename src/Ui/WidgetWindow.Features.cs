@@ -145,7 +145,7 @@ public partial class WidgetWindow
                         {
                             _notified["rain:" + k] = now;
                             msgs.Add((T("{}: yağış yaklaşıyor").F(name),
-                                T("{:%H:%M} civarında yağış bekleniyor ({}).").F(t.ToLocalTime(), Constants.Hadise.TryGetValue(hc, out var hn) ? hn : T("Yağışlı")), hc));
+                                T("{:%H:%M} civarında yağış bekleniyor ({}).").F(Fmt.LocalTime(t, data.UtcOffset), Constants.Hadise.TryGetValue(hc, out var hn) ? hn : T("Yağışlı")), hc));
                         }
                         break;
                     }
@@ -394,7 +394,8 @@ public partial class WidgetWindow
             ["scale"] = _cfg.Get("scale", 1.0), ["theme"] = _cfg.Get("theme", "auto"), ["opacity"] = _cfg.Get("opacity", 1.0),
             ["radius"] = _cfg.Get("radius", 22.0), ["custom_color"] = _cfg.Get<string?>("custom_color", null),
             ["bg_image"] = _cfg.Get<string?>("bg_image", null), ["units_temp"] = _cfg.Get("units_temp", "C"),
-            ["units_wind"] = _cfg.Get("units_wind", "kmh"), ["tray"] = false, ["notify_rain"] = false,
+            ["units_wind"] = _cfg.Get("units_wind", "kmh"), ["clock_12h"] = _cfg.Get("clock_12h", false),
+            ["text_color"] = _cfg.Get<string?>("text_color", null), ["icon_style"] = _cfg.Get("icon_style", "color"), ["tray"] = false, ["notify_rain"] = false,
             ["notify_alerts"] = false, ["notify_uv"] = false, ["morning_on"] = false, ["reminders_on"] = false,
             ["auto_update"] = false, ["hotkey"] = "off", ["rotate_touched"] = true,
         };
@@ -490,20 +491,32 @@ public partial class WidgetWindow
         ("#b23a48", T("Kırmızı")), ("#c46a1c", T("Turuncu")), ("#555c66", T("Gri")),
     };
 
-    private void ChooseCustomColor()
+    /// #RRGGBB sorar; iptal ya da geçersizse null.
+    private static string? PromptHex(string title, string current)
     {
-        var hex = Dialogs.Prompt(T("Kart rengi"), T("Renk kodu (#RRGGBB):"), _cfg.Get("custom_color", "#3b6ea5"));
-        if (hex is null) return;
-        hex = hex.Trim();
+        var hex = Dialogs.Prompt(title, T("Renk kodu (#RRGGBB):"), current)?.Trim();
+        if (hex is null) return null;
         if (!Regex.IsMatch(hex, "^#?[0-9a-fA-F]{6}$"))
         {
-            MessageBox.Show(T("Renk kodunu #RRGGBB biçiminde girin (ör. #3b6ea5)."), T("Kart rengi"));
-            return;
+            MessageBox.Show(T("Renk kodunu #RRGGBB biçiminde girin (ör. #3b6ea5)."), title);
+            return null;
         }
-        _cfg.Set("custom_color", hex.StartsWith('#') ? hex : "#" + hex);
+        return hex.StartsWith('#') ? hex : "#" + hex;
+    }
+
+    private void ChooseCustomColor()
+    {
+        if (PromptHex(T("Kart rengi"), _cfg.Get("custom_color", "#3b6ea5")) is not { } hex) return;
+        _cfg.Set("custom_color", hex);
         _cfg.Set("theme", "custom");
         TrySave();
         Render();
+    }
+
+    private void ChooseTextColor()
+    {
+        if (PromptHex(T("Yazı rengi"), _cfg.Get<string?>("text_color", null) ?? "#ffffff") is { } hex)
+            Set("text_color", hex);
     }
 
     private void ChooseBgImage()
@@ -576,7 +589,9 @@ public partial class WidgetWindow
         var setup = Path.Combine(Path.GetTempPath(), Constants.UpdateSetup);
         try
         {
-            try { await UpdateService.DownloadAsync(rel.SetupUrl!, false, rel.SetupSize, rel.SetupSha256, setup, CancellationToken.None); }
+            // bağlantı sessizce koparsa indirme sonsuza kadar beklemesin (Downloads istemcisinde zaman aşımı yok)
+            using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(10));
+            try { await UpdateService.DownloadAsync(rel.SetupUrl!, rel.SetupSize, rel.SetupSha256, setup, cts.Token); }
             catch
             {
                 try { if (File.Exists(setup)) File.Delete(setup); }

@@ -17,8 +17,10 @@ public partial class WidgetWindow
 
     internal void SwitchTo(int i)
     {
+        int old = _idx;
         _idx = ((i % _locs.Count) + _locs.Count) % _locs.Count;
         Render();
+        if (_idx != old) CityTransition(i > old ? 1 : -1);   // tekerlekle sondan başa geçişte de yön korunur
         if (!_cfg.LoadFailed)
         {
             _cfg.Set("idx", _idx);
@@ -93,8 +95,7 @@ public partial class WidgetWindow
     /// Ayar değişince: birimler, pencere boyutu (ölçek / düzen), yeniden çizim.
     private void ApplySettingsChanged(bool relayout = false)
     {
-        Units.Fahrenheit = _cfg.Get("units_temp", "C") == "F";
-        Units.WindMs = _cfg.Get("units_wind", "kmh") == "ms";
+        CardSettings.ApplyGlobals(_cfg);
         if (relayout)
         {
             if (_expanded) Expand(false);
@@ -172,6 +173,15 @@ public partial class WidgetWindow
         theme.Items.Add(colors);
         theme.Items.Add(Act(T("Arka plan görselini seç…"), ChooseBgImage));
         look.Items.Add(theme);
+        var textColor = _cfg.Get<string?>("text_color", null);
+        var text = Sub(T("Yazı rengi"));
+        foreach (var (hex, name) in new (string?, string)[] { (null, T("Temaya göre")), ("#ffffff", T("Beyaz")), ("#161c26", T("Siyah")) })
+            text.Items.Add(Radio(name, string.Equals(textColor, hex, StringComparison.OrdinalIgnoreCase), () => Set("text_color", hex)));
+        text.Items.Add(Act(T("Başka renk…"), ChooseTextColor));
+        look.Items.Add(text);
+        look.Items.Add(Choice(T("İkon stili"), _cfg.Get("icon_style", "color"),
+            new[] { ("color", T("Renkli")), ("pastel", T("Pastel")), ("mono", T("Tek renk")) },
+            v => Set("icon_style", v, () => ApplySettingsChanged())));
         look.Items.Add(Choice(T("Ölçek"), _cfg.Get("scale", 1.0), new[] { 0.7, 0.85, 1.0, 1.15, 1.3, 1.5 }.Select(v => (v, Pct(v * 100))),
             v => Set("scale", v, () => ApplySettingsChanged(relayout: true))));
         look.Items.Add(Choice(T("Köşeler"), _cfg.Get("radius", 22.0), new[] { (0.0, T("Köşeli")), (10.0, T("Az")), (22.0, T("Normal")), (32.0, T("Çok")) },
@@ -217,6 +227,8 @@ public partial class WidgetWindow
             v => Set("units_temp", v, () => ApplySettingsChanged())));
         units.Items.Add(Choice(T("Rüzgar"), _cfg.Get("units_wind", "kmh"), new[] { ("kmh", "km/saat"), ("ms", "m/sn") },
             v => Set("units_wind", v, () => ApplySettingsChanged())));
+        units.Items.Add(Choice(T("Saat biçimi"), _cfg.Get("clock_12h", false), new[] { (false, T("24 saat (14:00)")), (true, T("12 saat (2:00 PM)")) },
+            v => Set("clock_12h", v, () => ApplySettingsChanged())));
         items.Add(units);
         items.Add(new Separator());
 
@@ -268,7 +280,7 @@ public partial class WidgetWindow
             var lt = t.ToLocalTime();
             var day = lt.Date == DateTime.Today ? T("Bugün") : T("Dün");
             if (day != lastDay) { events.Items.Add(Info(day, bold: true)); lastDay = day; }
-            events.Items.Add(Info($"{lt:HH:mm}   {J.Str(e["city"])}   —   {EventLog.Text(e)}"));
+            events.Items.Add(Info($"{Fmt.Hm(lt)}   {J.Str(e["city"])}   —   {EventLog.Text(e)}"));
         }
         events.Items.Add(new Separator());
         events.Items.Add(Info(T("Kaydedilenler: yağış başlangıcı ve bitişi,")));

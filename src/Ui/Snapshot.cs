@@ -26,6 +26,7 @@ public static class Snapshot
         var locs = cfg.GetLocations();
         Directory.CreateDirectory(outDir);
         var settings = CardSettings.From(cfg);
+        CardSettings.ApplyGlobals(cfg);
         var now = DateTime.UtcNow;
         int n = 0;
 

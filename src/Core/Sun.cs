@@ -45,8 +45,8 @@ public static class Sun
         var (rise, set, polar) = Hours(lat, lon, utc);
         if (polar != 0) return null;
         var day = utc.Date;
-        return (Fmt.LocalTime(day.AddHours(rise), offset).ToString("HH:mm"),
-                Fmt.LocalTime(day.AddHours(set), offset).ToString("HH:mm"));
+        return (Fmt.Hm(Fmt.LocalTime(day.AddHours(rise), offset)),
+                Fmt.Hm(Fmt.LocalTime(day.AddHours(set), offset)));
     }
 
     /// Bir sonraki doğuş/batış: 2 saatten uzaksa saati, yakınsa kalan süre (Python sun_eta).
@@ -65,7 +65,7 @@ public static class Sun
         if (next is not { } nx) return null;
         int mins = Math.Max(1, (int)Math.Round((nx.Item1 - nowUtc).TotalMinutes));
         return mins > 120
-            ? $"{nx.Item2} {Fmt.LocalTime(nx.Item1, offset):HH:mm}"
+            ? $"{nx.Item2} {Fmt.Hm(Fmt.LocalTime(nx.Item1, offset))}"
             : $"{nx.Item2} {Fmt.Minutes(mins)}";
     }
 

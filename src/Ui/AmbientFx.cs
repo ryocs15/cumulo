@@ -500,17 +500,21 @@ public sealed class AmbientFx
         var geo = new GeometryGroup { FillRule = FillRule.Nonzero };
         foreach (var s in shapes) geo.Children.Add(new EllipseGeometry(new Rect(s.X + m, s.Y + m, s.Width, s.Height)));
         geo.Freeze();
-        // PIL GaussianBlur(radius) bir standart sapmadır; WPF BlurEffect.Radius çekirdek yarıçapı (~3 sigma)
-        var dv = new DrawingVisual { Effect = new BlurEffect { Radius = blur * 3, KernelType = KernelType.Gaussian } };
+        // Bulanıklık yazılımla çizilir, süresi piksel x çekirdek ile büyür (büyük kartın güneş halesi ~1,1 sn
+        // arayüzü donduruyordu). Çok bulanık şekil düşük çözünürlükte çizilip büyütülür.
+        double scale = Math.Clamp(8 / blur, 0.25, 2);
+        // PIL GaussianBlur(radius) bir standart sapmadır; WPF BlurEffect.Radius çekirdek yarıçapı (~3 sigma).
+        // Eski 2x çizimde WPF yarıçapı 100 pikselde (50 DIP) kesiyordu; görünüm aynı kalsın diye sınır korunur.
+        var dv = new DrawingVisual { Effect = new BlurEffect { Radius = Math.Min(blur * 3, 50), KernelType = KernelType.Gaussian } };
         using (var dc = dv.RenderOpen()) dc.DrawGeometry(brush, null, geo);
         double bw = Math.Max(1, w) + 2 * m, bh = Math.Max(1, h) + 2 * m;
-        return (Bake(dv, bw, bh), new Rect(0, 0, bw, bh));
+        return (Bake(dv, bw, bh, scale), new Rect(0, 0, bw, bh));
     }
 
-    /// Görseli 2 kat çözünürlükte bitmap'e çizer (ölçekli kartta da yumuşak kalsın).
-    private static ImageSource Bake(Visual v, double w, double h)
+    /// Görseli bitmap'e çizer; varsayılan 2 kat çözünürlük (ölçekli kartta da yumuşak kalsın).
+    private static ImageSource Bake(Visual v, double w, double h, double scale = 2)
     {
-        var rtb = new RenderTargetBitmap((int)Math.Ceiling(w * 2), (int)Math.Ceiling(h * 2), 192, 192, PixelFormats.Pbgra32);
+        var rtb = new RenderTargetBitmap((int)Math.Ceiling(w * scale), (int)Math.Ceiling(h * scale), 96 * scale, 96 * scale, PixelFormats.Pbgra32);
         rtb.Render(v);
         rtb.Freeze();
         return rtb;

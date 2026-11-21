@@ -25,6 +25,17 @@ internal static class SelfTest
         Check(WidgetWindow.ParseHhmm("24:00") is null && WidgetWindow.ParseHhmm("abc") is null, "geçersiz saat reddedilir");
         Check(UpdateService.IsNewer("1.3.2", "1.3.1") && !UpdateService.IsNewer("1.3.1", "1.3.1")
               && UpdateService.IsNewer("1.3.1.0", "1.3.1") && !UpdateService.IsNewer("1.2.9", "1.3"), "sürüm karşılaştırma (Python tuple)");
+        var t1405 = new DateTime(2026, 11, 21, 14, 5, 0);
+        bool h24 = Fmt.Hm(t1405) == "14:05" && Fmt.Hour(t1405.AddMinutes(-5)) == "14:00";
+        Units.Clock12 = true;
+        bool h12 = Fmt.Hm(t1405) == "2:05 PM" && Fmt.Hour(t1405.AddMinutes(-5)) == "2 PM" && Fmt.Hm(t1405.AddHours(-14)) == "12:05 AM";
+        Units.Clock12 = false;
+        Check(h24 && h12, "saat biçimi: 24 saat ve 12 saat (AM/PM)");
+        var red = Theme.StyleFor("dark", null, "#ff0000");
+        Check(red.Text == System.Windows.Media.Color.FromRgb(255, 0, 0) && red.Muted.A == Theme.Dark.Muted.A && red.Muted.R == 255
+              && Theme.StyleFor("dark", null, "kırmızı") == Theme.Dark && Theme.StyleFor("light", null, null) == Theme.Light,
+            "yazı rengi: seçilen renk, soluk tonlar temanın saydamlığıyla; geçersiz renk yok sayılır");
+
         static bool Trusted(string u) { try { UpdateService.EnsureTrustedUrl(u); return true; } catch (InvalidDataException) { return false; } }
         Check(Trusted("https://github.com/ryocs15/cumulo/releases/download/v1.7.0/HavaDurumu-Kurulum.exe")
               && Trusted("https://github.com/ryocs15/hava-durumu-widget/releases/download/v1.7.0/HavaDurumu-Kurulum.exe")
@@ -48,6 +59,25 @@ internal static class SelfTest
               && J.Arr(mx["daily16"]).Count == 1 && J.Str(J.Obj(J.Arr(mx["daily16"])[0])["d"]) == "2026-11-20",
             "MGM saatlik ve 5 günlük tahmin temps12 / daily16 biçiminde");
 
+        // MGM uyarıları: süresi dolan atlanır; ilçe hem sarı hem turuncu listedeyse en ciddisi (turuncu) alınır
+        var ilce = new Location { Il = "Ankara", Ilce = "Keçiören", MerkezId = JsonValue.Create(90601) };
+        JsonObject Alert(string no, string end, JsonObject towns) => new()
+        {
+            ["alertNo"] = no, ["begin"] = "2026-11-21T06:00:00.000Z", ["end"] = end, ["towns"] = towns,
+            ["weather"] = new JsonObject { ["orange"] = new JsonArray("wind"), ["yellow"] = new JsonArray("rain") },
+            ["text"] = new JsonObject { ["orange"] = "Kuvvetli rüzgar" },
+        };
+        var alerts = AlertService.AlertsFor(ilce, new JsonArray(
+            Alert("1", "2026-11-21T08:00:00.000Z", new JsonObject { ["red"] = new JsonArray(90601) }),                  // süresi doldu
+            Alert("2", "2026-11-21T20:00:00.000Z", new JsonObject { ["yellow"] = new JsonArray(90601), ["orange"] = new JsonArray("90601") }),
+            Alert("3", "2026-11-21T20:00:00.000Z", new JsonObject { ["red"] = new JsonArray(12345) })),                  // başka ilçe
+            new DateTime(2026, 11, 21, 12, 0, 0, DateTimeKind.Utc));
+        Check(alerts.Count == 1 && alerts[0].Color == "orange" && alerts[0].No == "2" && alerts[0].Codes.SequenceEqual(new[] { "wind" }),
+            "MGM uyarısı: ilçe eşleşir (sayı ya da metin kimlik), süresi dolan atlanır, en ciddi renk seçilir");
+        Check(AlertService.AlertsFor(new Location { Src = "om", MerkezId = JsonValue.Create("om_1_2") }, new JsonArray(
+            Alert("4", "2026-11-21T20:00:00.000Z", new JsonObject { ["red"] = new JsonArray("om_1_2") }))).Count == 0,
+            "MGM uyarısı: yurt dışı konumda uyarı yok");
+
         var dir = Path.Combine(Path.GetTempPath(), "hd_selftest_" + Environment.ProcessId);
         Directory.CreateDirectory(dir);
         try
@@ -69,32 +99,27 @@ internal static class SelfTest
             log.Save();
             Check(new EventLog(Path.Combine(dir, "events.json")).Events.Count == 2, "olay günlüğü: dosyaya yazıp geri okuma");
 
-            // Python 1.3.x klasör kipi güncellemesi: yeni exe, _update'ten hedefe dosyaları taşır
+            // bozuk ayar dosyası: okunamazsa üzerine yazılmaz (kullanıcının şehirleri silinmesin)
+            var cfgPath = Path.Combine(dir, "config.json");
+            const string broken = "{\"locs\": [ {\"il\": \"Ankara\"";
+            File.WriteAllText(cfgPath, broken);
+            var cfg = AppConfig.Load(cfgPath);
+            cfg.Set("layout", "mini");
+            bool refused = false;
+            try { cfg.Save(); } catch (InvalidOperationException) { refused = true; }
+            Check(cfg.LoadFailed && refused && File.ReadAllText(cfgPath) == broken, "ayarlar: bozuk dosyanın üzerine yazılmaz");
+            var ok = AppConfig.Load(Path.Combine(dir, "yeni.json"));
+            ok.Set("layout", "mini");
+            ok.Save();
+            Check(AppConfig.Load(Path.Combine(dir, "yeni.json")).Get("layout", "") == "mini", "ayarlar: kaydedip geri okuma");
+
+            // Python klasör kipi güncellemesinden kalan dosyalar açılışta silinir
             var target = Path.Combine(dir, "kurulum");
-            var stage = Path.Combine(dir, "_update");
-            Directory.CreateDirectory(Path.Combine(target, "_internal"));
-            Directory.CreateDirectory(Path.Combine(stage, "_internal", "alt"));
-            File.WriteAllText(Path.Combine(target, "HavaDurumu.exe"), "eski");
-            File.WriteAllText(Path.Combine(target, "_internal", "eski.dll"), "eski");
-            File.WriteAllText(Path.Combine(target, "config.json"), "{\"korunur\": true}");
-            File.WriteAllText(Path.Combine(stage, "HavaDurumu.exe"), "yeni");
-            File.WriteAllText(Path.Combine(stage, "_internal", "alt", "yeni.dll"), "yeni");
-            UpdateService.ApplyUpdate(target, stage, launch: false);
-            Check(File.ReadAllText(Path.Combine(target, "HavaDurumu.exe")) == "yeni"
-                  && File.Exists(Path.Combine(target, "_internal", "alt", "yeni.dll"))
-                  && !File.Exists(Path.Combine(target, "_internal", "eski.dll")), "güncelleme: yeni exe ve _internal yerinde");
-            Check(File.ReadAllText(Path.Combine(target, "config.json")).Contains("korunur"), "güncelleme: config.json korunur");
+            Directory.CreateDirectory(Path.Combine(target, "_internal.old"));
+            File.WriteAllText(Path.Combine(target, "HavaDurumu.exe.old"), "eski");
             Check(!UpdateService.CleanupOld(target, Path.Combine(target, "HavaDurumu.exe"))
                   && !File.Exists(Path.Combine(target, "HavaDurumu.exe.old")) && !Directory.Exists(Path.Combine(target, "_internal.old")),
                 "güncelleme: eski dosyalar temizlenir");
-
-            // hedef kilitliyken geri alma: kaynakta _internal yok ama exe yok -> kopyalama başarısız, eski geri gelir
-            var t2 = Path.Combine(dir, "kurulum2");
-            Directory.CreateDirectory(Path.Combine(t2, "_internal"));
-            File.WriteAllText(Path.Combine(t2, "HavaDurumu.exe"), "eski");
-            UpdateService.ApplyUpdate(t2, Path.Combine(dir, "yok"), launch: false);
-            Check(File.ReadAllText(Path.Combine(t2, "HavaDurumu.exe")) == "eski" && Directory.Exists(Path.Combine(t2, "_internal")),
-                "güncelleme başarısızsa eski sürüm geri konur");
         }
         finally
         {

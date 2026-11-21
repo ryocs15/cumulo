@@ -77,8 +77,7 @@ public partial class WidgetWindow : Window
         _placeholder = !_cfg.Keys.Contains("locs") && !_cfg.Keys.Contains("loc");
         if (_locs.Count == 0) _locs.Add(DefaultLoc);
         _idx = Math.Clamp(_cfg.Get("idx", 0), 0, _locs.Count - 1);
-        Units.Fahrenheit = _cfg.Get("units_temp", "C") == "F";
-        Units.WindMs = _cfg.Get("units_wind", "kmh") == "ms";
+        CardSettings.ApplyGlobals(_cfg);
 
         InitializeComponent();
         _animator = new CardAnimator(() => Native.IsSeen(_hwnd, _x, _y, _w, _h), () => S);
@@ -94,7 +93,13 @@ public partial class WidgetWindow : Window
         MouseRightButtonUp += (_, e) => { ShowMenu(); e.Handled = true; };
         MouseWheel += OnWheel;
 
-        _hoverTimer.Tick += (_, _) => { _hoverTimer.Stop(); if (CursorOnWindow()) Expand(true); };
+        _hoverTimer.Tick += (_, _) =>
+        {
+            // imleç bir düğmenin (şehir noktası, yenile...) üstündeyse büyüme beklesin: yoksa nokta kayar, seçilemez
+            if (FindAction(Mouse.DirectlyOver as DependencyObject) is not null) return;
+            _hoverTimer.Stop();
+            if (CursorOnWindow()) Expand(true);
+        };
         _leaveTimer.Tick += (_, _) => { if (_expanded && !_animating && !CursorOnWindow() && !MenuOpen) OnHoverLeave(); };
         _clickTimer.Tick += (_, _) => { _clickTimer.Stop(); ClickAction(); };
         _expTimer.Tick += (_, _) => ExpandIdleTick();
@@ -156,7 +161,11 @@ public partial class WidgetWindow : Window
         StartTimers();
         InitFeatures();
         _ = RefreshAsync();
-        if (_placeholder && IsMain)   // ilk açılış: şehir seçtir (İngilizcede şehir araması odakta)
+        if (_cfg.LoadFailed)   // dosya korunur (üzerine yazılmaz); kullanıcı neden kaydedilmediğini bilsin
+            Dispatcher.BeginInvoke(() => MessageBox.Show(
+                T("Ayar dosyası okunamadı:\n{}\n\nWidget varsayılan ayarlarla açıldı. Dosya düzeltilene kadar değişiklikler kaydedilmeyecek.").F(_cfg.FilePath),
+                Constants.AppName, MessageBoxButton.OK, MessageBoxImage.Warning), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+        else if (_placeholder && IsMain)   // ilk açılış: şehir seçtir (İngilizcede şehir araması odakta)
             Dispatcher.BeginInvoke(() => CityManager.Open(this), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
     }
 
@@ -168,7 +177,7 @@ public partial class WidgetWindow : Window
 
     private void StartTimers()
     {
-        _refreshTimer.Interval = TimeSpan.FromMinutes(Math.Clamp(_cfg.Get("refresh_min", 15), 5, 60));
+        _refreshTimer.Interval = RefreshInterval;
         _refreshTimer.Start();
         _minuteTimer.Start();
         ScheduleRotate();
@@ -190,6 +199,7 @@ public partial class WidgetWindow : Window
         if (_expanded || _pressed || MenuOpen || CursorOnWindow() || Layouts.IsMulti(Layout)) return;
         _idx = (_idx + 1) % _locs.Count;
         Render();
+        CityTransition(1);
     }
 
     // ------------------------------------------------------------------ çizim
@@ -211,11 +221,9 @@ public partial class WidgetWindow : Window
     }
 
     /// Kartı veriye yeniden bağlar. Görünüm nesnesi düzen değişmedikçe yeniden oluşturulmaz.
-    private static readonly bool Debug = Environment.GetEnvironmentVariable("HAVADURUMU_DEBUG") == "1";
-
     private void Render()
     {
-        if (!Debug)
+        if (!Log.DebugOn)
         {
             RenderCore();
             return;
@@ -312,15 +320,17 @@ public partial class WidgetWindow : Window
         _refreshing = true;
         try
         {
-            var order = Enumerable.Range(0, _locs.Count).Select(i => (i + _idx) % _locs.Count).ToList();
-            if (_locs.Any(l => !l.IsOpenMeteo))
+            // kopya: indirme sürerken şehir eklenir / silinirse liste kayar (silinende IndexOutOfRange)
+            var locs = _locs.ToList();
+            var order = Enumerable.Range(0, locs.Count).Select(i => locs[(i + _idx) % locs.Count]).ToList();
+            if (locs.Any(l => !l.IsOpenMeteo))
             {
                 try { _cache.Alerts = await AlertService.FetchAsync(CancellationToken.None); }
                 catch (Exception ex) { Log.Write("uyarılar alınamadı: " + ex.Message); }
             }
-            foreach (var i in order)
+            foreach (var loc in order)
             {
-                var loc = _locs[i];
+                if (!_locs.Contains(loc)) continue;   // bu arada silindi
                 try
                 {
                     _cache.ById[loc.Key] = await WeatherService.FetchAsync(loc, CancellationToken.None);
@@ -340,10 +350,19 @@ public partial class WidgetWindow : Window
             _refreshing = false;
         }
         AfterRefresh();
+        // bu tur sürerken eklenen şehir: ne verisi ne hatası var; yenileme isteği "zaten yenileniyor" diye atlanmıştı
+        if (_locs.Any(l => !_cache.ById.ContainsKey(l.Key) && !_errors.ContainsKey(l.Key)))
+        {
+            _ = RefreshAsync();
+            return;
+        }
         _refreshTimer.Stop();   // başarısız şehir varsa 1 dk sonra yeniden dene
-        _refreshTimer.Interval = _errors.Count > 0 ? TimeSpan.FromMinutes(1) : TimeSpan.FromMinutes(Math.Clamp(_cfg.Get("refresh_min", 15), 1, 60));
+        _refreshTimer.Interval = _errors.Count > 0 ? TimeSpan.FromMinutes(1) : RefreshInterval;
         _refreshTimer.Start();
     }
+
+    /// Menüdeki seçenekler 5–60 dk; elle yazılmış değer de bu aralığa çekilir.
+    private TimeSpan RefreshInterval => TimeSpan.FromMinutes(Math.Clamp(_cfg.Get("refresh_min", 15), 5, 60));
 
     // ------------------------------------------------------------------ büyüme (üzerine gelince / tıklayınca)
     private void OnHoverEnter()
@@ -385,6 +404,8 @@ public partial class WidgetWindow : Window
     private void Expand(bool on)
     {
         if (on == _expanded || _animating || (on && !Layouts.IsSmall(Layout))) return;
+        Native.GetCursorPos(out var cp);
+        Log.WriteDebug($"büyüme: {(on ? "aç" : "kapat")} imleç {cp.X},{cp.Y} pencere {_x},{_y} {_w}x{_h} üstünde={IsMouseOver}");
         var (sw, sh) = Layouts.Size(Layout);
 
         if (on)
@@ -466,6 +487,26 @@ public partial class WidgetWindow : Window
         SmallHost.BeginAnimation(OpacityProperty, new DoubleAnimation(smallOpacityTo, dur) { EasingFunction = ease });
     }
 
+    /// Şehir değişince kartın içeriği (arka plan değil) yandan kayarak belirir; dir: +1 sonraki, -1 önceki.
+    /// Windows "Animasyon efektleri"ne bakılmaz: ikon ve büyüme animasyonları da bakmıyor (kullanıcı kararı).
+    private void CityTransition(int dir)
+    {
+        var view = _expanded ? _bigView : _smallView;
+        if (view?.Content is not Border { Child: Canvas inner }) return;
+        var dur = new Duration(TimeSpan.FromMilliseconds(320));
+        var ease = new QuadraticEase { EasingMode = EasingMode.EaseOut };
+        var slide = new TranslateTransform();
+        slide.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(18 * dir, 0, dur) { EasingFunction = ease });
+        var fade = new DoubleAnimation(0, 1, dur) { EasingFunction = ease, FillBehavior = FillBehavior.Stop };
+        // efekt katmanı yerinde kalır: saydam temalarda zemini o dolduruyor, soluklaşınca kartın arkası görünüyordu
+        foreach (UIElement c in inner.Children)
+        {
+            if (c is FxHost) continue;
+            c.RenderTransform = slide;
+            c.BeginAnimation(OpacityProperty, fade);
+        }
+    }
+
     private void ExpandIdleTick()
     {
         if (!_expanded || HoverExpandOn)
@@ -503,10 +544,13 @@ public partial class WidgetWindow : Window
         // yan yana / alt alta: Shift + sürükle (ya da konum kilitliyken sürükle) kartları sıralar
         _reorder = Layouts.IsMulti(Layout) && (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift) || _cfg.Get("locked", false))
             ? CardIndexAtCursor() : null;
+        // fare yakalanınca bırakma olayının kaynağı pencere olur; tıklanan düğme (nokta, yenile...) şimdi okunur
+        _pressAction = FindAction(e.OriginalSource as DependencyObject);
         CaptureMouse();
     }
 
     private int? _reorder;
+    private string? _pressAction;
 
     private void OnDrag(object sender, MouseEventArgs e)
     {
@@ -541,6 +585,7 @@ public partial class WidgetWindow : Window
         if (!_pressed) return;
         _pressed = false;
         ReleaseMouseCapture();
+        Log.WriteDebug($"tıklama: düğme={_pressAction ?? "-"} sürüklendi={_moved} büyük={_expanded}");
         if (_reorder is not null)
         {
             _reorder = null;   // sıralama MoveLocation ile zaten kaydedildi
@@ -549,7 +594,7 @@ public partial class WidgetWindow : Window
         {
             SavePosition();
         }
-        else if (FindAction(e.OriginalSource as DependencyObject) is string action)
+        else if (_pressAction is string action)
         {
             DoAction(action);
         }

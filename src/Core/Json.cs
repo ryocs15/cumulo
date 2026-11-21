@@ -32,6 +32,4 @@ public static class J
 
     public static double? At(IReadOnlyList<double?> list, int i) =>
         i >= 0 && i < list.Count ? list[i] : null;
-
-    public static JsonNode? Val(double? d) => JsonValue.Create(d);
 }

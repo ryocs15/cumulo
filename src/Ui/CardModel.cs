@@ -10,14 +10,23 @@ namespace HavaDurumu.Ui;
 public sealed record CardSettings(
     string Theme, string? CustomColor, double Opacity, double Radius, bool ColoredTemp,
     string MiniLine, bool Clock, bool AlertBorder, string HourlyMode, bool PagesOn,
-    bool Effects = true, bool Animate = false, string? BgImage = null)
+    bool Effects = true, bool Animate = false, string? BgImage = null, string? TextColor = null)
 {
     public static CardSettings From(AppConfig c) => new(
         c.Get("theme", "auto"), c.Get<string?>("custom_color", null), c.Get("opacity", 1.0),
         c.Get("radius", 22.0), c.Get("colored_temp", false), c.Get("mini_line", "hl"),
         c.Get("clock", true), c.Get("alert_border", true), c.Get("hourly", "icons"),
         c.Get("mini_click", "expand") == "page" || c.Get("wheel_action", "city") == "page",
-        c.Get("effects", true), c.Get("animate", false), c.Get<string?>("bg_image", null));
+        c.Get("effects", true), c.Get("animate", false), c.Get<string?>("bg_image", null), c.Get<string?>("text_color", null));
+
+    /// Bütün kartların ortak (statik) gösterim ayarları: birimler, saat biçimi, ikon stili.
+    public static void ApplyGlobals(AppConfig c)
+    {
+        Units.Fahrenheit = c.Get("units_temp", "C") == "F";
+        Units.WindMs = c.Get("units_wind", "kmh") == "ms";
+        Units.Clock12 = c.Get("clock_12h", false);
+        WeatherIcons.Style = c.Get("icon_style", "color");
+    }
 }
 
 public sealed record DotItem(double Size, double Opacity, int Index, Brush Fill)
@@ -207,7 +216,7 @@ public static class CardBuilder
         if (code.Length == 0) code = "CB";
         bool night = Sun.IsNight(loc.Lat, loc.Lon, nowUtc);
         double dayf = Sun.DayFactor(loc.Lat, loc.Lon, nowUtc);
-        var st = Theme.StyleFor(s.Theme, s.CustomColor);
+        var st = Theme.StyleFor(s.Theme, s.CustomColor, s.TextColor);
         var extra = data?.Extra ?? new JsonObject();
         var offset = data?.UtcOffset;
         var days = data?.DailyRows() ?? new();
@@ -379,7 +388,7 @@ public static class CardBuilder
         double nowUnix = (nowUtc - DateTime.UnixEpoch).TotalSeconds;
         if (kind == "rain_eta" && Fmt.RainEta(extra, code, nowUnix) is { } r) return r;
         if (kind == "sun" && Sun.Eta(loc.Lat, loc.Lon, nowUtc, offset) is { } sn) return sn;
-        if (kind == "clock") return Fmt.NowLocal(offset).ToString("HH:mm");
+        if (kind == "clock") return Fmt.Hm(Fmt.NowLocal(offset));
         var feels = J.Num(cur["hissedilenSicaklik"]);
         if (kind == "feels" && Fmt.Ok(feels)) return T("Hiss. {}").F(Fmt.Temp(feels));
         var rz = J.Num(cur["ruzgarHiz"]);
@@ -414,7 +423,7 @@ public static class CardBuilder
         var picks = new[] { 1, 3, 6 }.Where(i => i < rows.Count).Select(i => rows[i]).ToList();
         m.PageHoursEmpty = picks.Count == 0 ? T("Saatlik veri yok") : "";
         m.PageHours = picks.Select((r, i) => new HourItem(
-            Fmt.LocalTime(r.Utc, offset).ToString("HH:mm"),
+            Fmt.Hour(Fmt.LocalTime(r.Utc, offset)),
             WeatherIcons.Get(r.Code, Sun.IsNight(loc.Lat, loc.Lon, r.Utc), st.LightIcons),
             $"{Fmt.Tint(r.Temp)}°", tempFill(r.Temp), "", i * 50, 50, 3, 28, 0)).ToList();
     }
@@ -580,7 +589,7 @@ public static class CardBuilder
         {
             var (utc, code, temp, prob) = rows[i];
             bool now = i == 0 && utc <= nowUtc.AddMinutes(30);
-            string lab = now ? T("Şimdi") : Fmt.LocalTime(utc, offset).ToString("HH:mm");
+            string lab = now ? T("Şimdi") : Fmt.Hour(Fmt.LocalTime(utc, offset));
             bool hn = Sun.IsNight(loc.Lat, loc.Lon, now ? nowUtc : utc);
             // "Şimdi" saatlik tahmin değil, üstteki anlık gözlemle aynı ikonu göstersin
             var ic = now && J.Str(data.Cur?["hadiseKodu"]) is { Length: > 0 } cc ? cc : code;
@@ -652,7 +661,7 @@ public static class CardBuilder
         int n = hours.Count;
         double colw = (W - 2 * CardModel.Pad) / n;
         var xs = Enumerable.Range(0, n).Select(i => CardModel.Pad + colw * i + colw / 2).ToArray();
-        var labels = hours.Select((h, i) => i == 0 && h.Utc <= nowUtc ? T("Şimdi") : Fmt.LocalTime(h.Utc, offset).ToString("HH:mm")).ToArray();
+        var labels = hours.Select((h, i) => i == 0 && h.Utc <= nowUtc ? T("Şimdi") : Fmt.Hour(Fmt.LocalTime(h.Utc, offset))).ToArray();
 
         if (!chart)
         {
@@ -722,7 +731,7 @@ public static class CardBuilder
         }
         var foot = data.Src == "om" ? T("Kaynak: Open-Meteo") : T("Kaynak: MGM");
         if (AlertService.TryParseUtc(J.StrOrNull(data.Cur?["veriZamani"]), out var vt))
-            foot += T(" · Ölçüm ") + Fmt.LocalTime(vt, offset).ToString("HH:mm");
+            foot += T(" · Ölçüm ") + Fmt.Hm(Fmt.LocalTime(vt, offset));
         m.FooterText = foot;
         m.FooterBrush = st.MutedBrush;
     }

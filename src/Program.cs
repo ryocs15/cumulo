@@ -50,12 +50,6 @@ internal static class Program
         int wi = Array.IndexOf(args, "--wait-pid");
         if (wi >= 0 && wi + 1 < args.Length && int.TryParse(args[wi + 1], out var waitPid))
             Update.UpdateService.WaitPid(waitPid);
-        int ai = Array.IndexOf(args, "--apply-update");
-        if (ai >= 0 && ai + 1 < args.Length && Directory.Exists(args[ai + 1]))
-        {
-            Update.UpdateService.ApplyUpdate(args[ai + 1]);   // dosyaları taşı, yeni sürümü başlat, çık
-            return 0;
-        }
 
         using var mutex = new Mutex(false, paths.MutexName, out bool createdNew);
         if (!createdNew) return 0;   // aynı klasörde aynı widget zaten açık

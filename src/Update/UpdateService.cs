@@ -16,7 +16,6 @@ public sealed record ReleaseInfo(
 
 /// GitHub Releases üzerinden güncelleme: sürüm karşılaştırma, indirme ve doğrulama.
 /// Bu sürüm kendini yalnızca kurulum dosyasıyla günceller (Python 1.4.1+ ile aynı).
-/// ApplyUpdate, 1.3.x Python istemcilerinin zip'le gelen yeni exe'yi --apply-update ile çalıştırması içindir.
 public static class UpdateService
 {
     public static int[] ParseVersion(string? s) =>
@@ -76,12 +75,11 @@ public static class UpdateService
             throw new InvalidDataException("beklenmeyen indirme adresi");
     }
 
-    /// İndirir ve doğrular: adres, dosya imzası (MZ / PK), boyut ve varsa SHA-256.
+    /// İndirir ve doğrular: adres, exe imzası (MZ), boyut ve varsa SHA-256.
     public static async Task DownloadAsync(
-        string url, bool isZip, long? expectedSize, string? expectedSha256, string destPath, CancellationToken ct)
+        string url, long? expectedSize, string? expectedSha256, string destPath, CancellationToken ct)
     {
         EnsureTrustedUrl(url);
-        var magic = isZip ? new byte[] { 0x50, 0x4B } : new byte[] { 0x4D, 0x5A };
 
         using var req = new HttpRequestMessage(HttpMethod.Get, url);
         req.Headers.TryAddWithoutValidation("User-Agent", "HavaDurumuWidget");
@@ -93,16 +91,19 @@ public static class UpdateService
         using var dst = File.Create(destPath);
         using var hasher = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
         var buffer = new byte[1 << 16];
+        var head = new byte[2];   // ilk iki bayt "MZ" olmalı; ağ ilk okumada 1 bayt verebilir
         long total = 0;
         int read;
         while ((read = await src.ReadAsync(buffer.AsMemory(0, buffer.Length), ct).ConfigureAwait(false)) > 0)
         {
-            if (total == 0 && (read < 2 || buffer[0] != magic[0] || buffer[1] != magic[1]))
-                throw new InvalidDataException($"indirilen dosya bir {(isZip ? "zip" : "exe")} değil");
+            for (int i = 0; total + i < 2 && i < read; i++) head[total + i] = buffer[i];
+            if (total < 2 && total + read >= 2 && (head[0] != 0x4D || head[1] != 0x5A))
+                throw new InvalidDataException("indirilen dosya bir exe değil");
             await dst.WriteAsync(buffer.AsMemory(0, read), ct).ConfigureAwait(false);
             hasher.AppendData(buffer, 0, read);
             total += read;
         }
+        if (total < 2) throw new InvalidDataException("indirilen dosya bir exe değil");
 
         if (expectedSize is long size && total != size)
             throw new InvalidDataException($"dosya boyutu tutmuyor ({total} / {size})");
@@ -167,63 +168,5 @@ public static class UpdateService
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { left = true; }
         }
         return left;
-    }
-
-    /// Klasör kipi güncellemesinin ikinci yarısı (Python apply_update; Python 1.3.x de bunu çağırır):
-    /// bu süreç _update klasöründeki YENİ exe'dir. Eski sürüm kapanınca exe ve _internal'ı hedefe taşır,
-    /// yeni sürümü başlatır. Bir adım başarısız olursa eski dosyalar geri konur ve eski sürüm başlar.
-    public static void ApplyUpdate(string target, string? srcDir = null, bool launch = true)
-    {
-        var src = srcDir ?? Path.GetDirectoryName(Environment.ProcessPath)!;
-        string exeT = Path.Combine(target, "HavaDurumu.exe"), intT = Path.Combine(target, "_internal");
-        void ULog(string s)
-        {
-            try { File.AppendAllText(Path.Combine(target, "widget.log"), $"{DateTime.Now:yyyy-MM-dd HH:mm:ss} güncelleme: {s}{Environment.NewLine}"); }
-            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
-        }
-        bool movedInt = false, movedExe = false;
-        try
-        {
-            if (Directory.Exists(intT + ".old")) Directory.Delete(intT + ".old", true);
-            if (File.Exists(exeT + ".old")) File.Delete(exeT + ".old");
-            for (int i = 0; ; i++)   // eski süreçlerin dosyaları bırakması için ~15 sn
-            {
-                try
-                {
-                    if (Directory.Exists(intT)) Directory.Move(intT, intT + ".old");
-                    movedInt = true;
-                    break;
-                }
-                catch (IOException) when (i < 75) { Thread.Sleep(200); }
-            }
-            File.Move(exeT, exeT + ".old");
-            movedExe = true;
-            CopyDir(Path.Combine(src, "_internal"), intT);
-            File.Copy(Path.Combine(src, "HavaDurumu.exe"), exeT);
-            ULog("tamamlandı");
-        }
-        catch (Exception ex)
-        {
-            ULog("başarısız, eski sürüme dönülüyor: " + ex);
-            if (movedInt && Directory.Exists(intT + ".old"))
-            {
-                if (Directory.Exists(intT)) Directory.Delete(intT, true);
-                Directory.Move(intT + ".old", intT);
-            }
-            if (movedExe)
-            {
-                if (File.Exists(exeT)) File.Delete(exeT);
-                File.Move(exeT + ".old", exeT);
-            }
-        }
-        if (launch) Spawn(exeT);
-    }
-
-    private static void CopyDir(string from, string to)
-    {
-        Directory.CreateDirectory(to);
-        if (!Directory.Exists(from)) return;
-        foreach (var f in Directory.GetFiles(from)) File.Copy(f, Path.Combine(to, Path.GetFileName(f)));
-        foreach (var d in Directory.GetDirectories(from)) CopyDir(d, Path.Combine(to, Path.GetFileName(d)));
     }
 }

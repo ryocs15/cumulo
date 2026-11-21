@@ -1,6 +1,7 @@
 {
  "   (sessiz: açık)": "   (quiet: on)",
  "Bağlantı hatası": "Connection error",
+ "Ayar dosyası okunamadı:\n{}\n\nWidget varsayılan ayarlarla açıldı. Dosya düzeltilene kadar değişiklikler kaydedilmeyecek.": "Could not read the settings file:\n{}\n\nThe widget started with default settings. Changes will not be saved until the file is fixed.",
  "Başka renk…": "Other color…",
  "Başlat menüsü kısayolu": "Start menu shortcut",
  "Renk kodu (#RRGGBB):": "Color code (#RRGGBB):",
@@ -8,5 +9,16 @@
  "Sürüm {} hazır. Kurmak için widget'a sağ tıklayıp Güncelleme menüsünü aç.": "Version {} is ready. Right-click the widget and open Update to install it.",
  "Tamam": "OK",
  "{} uyarı: {}": "{} warning: {}",
- "İptal": "Cancel"
+ "İptal": "Cancel",
+ "Yazı rengi": "Text color",
+ "Temaya göre": "Match theme",
+ "Beyaz": "White",
+ "Siyah": "Black",
+ "İkon stili": "Icon style",
+ "Renkli": "Colorful",
+ "Pastel": "Pastel",
+ "Tek renk": "Monochrome",
+ "Saat biçimi": "Time format",
+ "24 saat (14:00)": "24-hour (14:00)",
+ "12 saat (2:00 PM)": "12-hour (2:00 PM)"
 }

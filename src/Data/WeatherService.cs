@@ -20,10 +20,9 @@ public sealed class WeatherData
 
     public string? Src => J.StrOrNull(Root["src"]);
 
-    public string Fetched => J.Str(Root["fetched"]);
-
-    /// Yurt dışı şehirlerde şehrin saat farkı; MGM verisinde null (sistem saati).
-    public TimeSpan? UtcOffset => J.Num(Root["utc_offset"]) is double s ? TimeSpan.FromSeconds(s) : null;
+    /// Şehrin saat farkı: Open-Meteo verisinde utc_offset; MGM verisinde Türkiye saati (UTC+3, 2016'dan beri
+    /// yaz saati yok). Bilgisayarın saat dilimi kullanılsaydı yurt dışından bakan Türkiye saatlerini kaymış görürdü.
+    public TimeSpan? UtcOffset => J.Num(Root["utc_offset"]) is double s ? TimeSpan.FromSeconds(s) : TimeSpan.FromHours(3);
 
     /// (gün, hadise, en düşük, en yüksek) — bugünden başlayarak en çok 5 gün (Python daily_rows).
     public List<(DateOnly Day, string Code, double Lo, double Hi)> DailyRows()
